@@ -55,6 +55,11 @@ const upstashRedis = (() => {
   return new Redis({ url: creds.url, token: creds.token });
 })();
 
+/** The shared Redis, or null when it isn't set up (development). */
+export function getUpstashRedis(): Redis | null {
+  return upstashRedis;
+}
+
 const upstashLimiterCache = new Map<string, Ratelimit>();
 
 function getUpstashLimiter(config: RateLimitConfig): Ratelimit | null {

@@ -1,312 +1,274 @@
 // -----------------------------------------------------------------------------
 // @file: app/creative/page.tsx
-// @purpose: Creative-facing overview dashboard (tokens + jobs + withdrawals)
+// @purpose: Creative Home: a greeting banner that follows the time of day,
+//           shortcuts, the requests to act on next, progress to the next
+//           payout tier, the latest withdrawal and recent work. The numbers
+//           that used to live here are on Stats (/creative/stats).
 // -----------------------------------------------------------------------------
 
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
-  IconArrowUpRight,
+  IconArrowRight,
+  IconCheck,
   IconCoins,
-  IconDocument,
+  IconLayers,
   IconTicket,
   IconWallet,
 } from "@/components/admin/v2/icons";
 import {
-  Badge,
   ButtonLink,
   Callout,
-  Card,
-  CardTitle,
-  DASH,
-  EmptyState,
-  FilterChips,
   fmt,
   IconTile,
-  PageHeader,
   plural,
-  PRIORITY,
   Skeleton,
-  StatusDot,
-  Table,
-  Td,
   TextLink,
-  Th,
-  TICKET_STATUS,
 } from "@/components/admin/v2/ui";
 import { PauseBanner } from "@/components/creative/pause-banner";
-import { FirstPassStreakCard } from "@/components/engagement/first-pass-streak-card";
 import {
   formatDate,
   formatTokens,
-  MiniStat,
-  MoneyStat,
-  TokenFigure,
   WithdrawalBadge,
   type WithdrawalStatus,
 } from "@/components/dashboard/money/money-ui";
-import { formatDueDateCountdown, isDueDateOverdue, isDueDateSoon } from "@/lib/board";
-import { buildTicketCode } from "@/lib/ticket-code";
+import {
+  ArrowLink,
+  AttentionList,
+  HeroStat,
+  HomeHero,
+  useHeroSlot,
+  RecentCards,
+  ShortcutCards,
+  type AttentionItem,
+  type RecentItem as RecentCard,
+} from "@/components/home/home-ui";
+import { IconColorStudio, IconMoodboards, IconPortfolio } from "@/components/navigation/nav-icons";
+import { IconTools } from "@/components/tools/tool-icons";
+import { HERO_GREETING } from "@/lib/home/hero";
+import {
+  creativeMoves,
+  recentWork,
+  REMINDER_LIMIT,
+  type HomeMoodboard,
+  type HomeStatus,
+  type HomeTicket,
+} from "@/lib/home/home";
 import { useLiveRefresh } from "@/lib/hooks/use-live-refresh";
+import { buildTicketCode } from "@/lib/ticket-code";
+import { allToolsHref } from "@/lib/tools/registry";
 
-const NEXT_JOBS_LIMIT = 5;
-
-type TicketStatus = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
-type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
-
-type LedgerDirection = "CREDIT" | "DEBIT";
-
-type CreativeBalanceResponse = {
-  user: {
-    id: string;
-    email: string;
-    name: string | null;
-    role: string;
-  };
+type BalanceResponse = {
+  user: { id: string; email: string; name: string | null };
   balance: number;
-  ledger: {
+};
+
+type TicketsResponse = {
+  stats: { openTotal?: number; total: number; byStatus: Record<HomeStatus, number> };
+  tickets: {
     id: string;
+    title: string;
+    status: HomeStatus;
+    dueDate: string | null;
+    companyTicketNumber: number | null;
     createdAt: string;
-    direction: LedgerDirection;
-    amount: number;
-    reason: string | null;
-    notes: string | null;
-    metadata: unknown;
-    balanceBefore: number | null;
-    balanceAfter: number | null;
-    ticketId: string | null;
-    companyId: string | null;
+    updatedAt: string;
+    project: { id: string; name: string; code: string | null } | null;
+    latestRevisionHasFeedback?: boolean;
   }[];
 };
 
-type CreativeTicket = {
-  id: string;
-  title: string;
-  description: string | null;
-  status: TicketStatus;
-  priority: TicketPriority;
-  dueDate: string | null;
-  companyTicketNumber: number | null;
-  createdAt: string;
-  updatedAt: string;
-  company: {
-    id: string;
-    name: string;
-    slug: string;
-  } | null;
-  project: {
-    id: string;
-    name: string;
-    code: string | null;
-  } | null;
-  jobType: {
-    id: string;
-    name: string;
-    tokenCost: number;
-    creativePayoutTokens: number;
-  } | null;
-};
-
-type CreativeTicketsResponse = {
-  stats: {
-    byStatus: Record<TicketStatus, number>;
-    total: number;
-    openTotal: number;
-    byPriority: Record<TicketPriority, number>;
-    loadScore: number;
-  };
-  tickets: CreativeTicket[];
-};
-
-type CreativeWithdrawal = {
-  id: string;
-  amountTokens: number;
-  status: WithdrawalStatus;
-  createdAt: string;
-  approvedAt: string | null;
-};
-
-type CreativeWithdrawalsResponse = {
-  stats: {
-    availableBalance: number;
-    reservedTokens: number;
-    spendableBalance: number;
-    totalRequested: number;
-    pendingCount: number;
-    withdrawalsCount: number;
-  };
-  withdrawals: CreativeWithdrawal[];
+type WithdrawalsResponse = {
+  withdrawals: { id: string; amountTokens: number; status: WithdrawalStatus; createdAt: string }[];
 };
 
 type PayoutTierResponse = {
   currentPayoutPercent: number;
   currentTierName: string | null;
-  basePayoutPercent: number;
   tiers: {
     id: string;
     name: string;
-    description: string | null;
     minCompletedTickets: number;
-    timeWindowDays: number;
     payoutPercent: number;
     completedInWindow: number;
     qualified: boolean;
   }[];
 };
 
-type CreativeDashboardData = {
-  balance: CreativeBalanceResponse;
-  tickets: CreativeTicketsResponse;
-  withdrawals: CreativeWithdrawalsResponse;
+type HomeData = {
+  balance: BalanceResponse;
+  tickets: TicketsResponse;
+  withdrawals: WithdrawalsResponse;
   payoutTier: PayoutTierResponse | null;
-  firstPassStreak: number | null;
-  skillCount: number;
+  moodboards: HomeMoodboard[];
+  /** null when the skills request failed: don't nag about setup on a guess. */
+  skillCount: number | null;
 };
 
-type DashboardState =
+type HomeState =
   | { status: "loading" }
   | { status: "error"; message: string }
-  | { status: "ready"; data: CreativeDashboardData };
+  | { status: "ready"; data: HomeData; now: Date };
 
-type NextJobsFilter = "ALL" | Exclude<TicketStatus, "DONE">;
-
-const STATUS_ORDER: TicketStatus[] = ["TODO", "IN_PROGRESS", "IN_REVIEW", "DONE"];
-const OPEN_STATUSES: Exclude<TicketStatus, "DONE">[] = ["TODO", "IN_PROGRESS", "IN_REVIEW"];
-const PRIORITY_ORDER: TicketPriority[] = ["URGENT", "HIGH", "MEDIUM", "LOW"];
-
-/** Bands from the existing load score copy: below 50, 50-80, above 80. */
-function loadBand(score: number): { label: string; color: string } {
-  if (score > 80) return { label: "Heavy", color: "var(--av2-fill-red)" };
-  if (score >= 50) return { label: "Moderate", color: "var(--av2-fill-amber)" };
-  return { label: "Light", color: "var(--av2-fill-green)" };
+async function readJson<T>(url: string, label: string): Promise<T> {
+  const res = await fetch(url, { cache: "no-store" });
+  const json = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(json?.error || `${label} request failed with status ${res.status}`);
+  return json as T;
 }
 
-function CountTile({ label, value }: { label: React.ReactNode; value: number | null | undefined }) {
-  return (
-    <div className="min-w-0 rounded-xl border border-[var(--av2-border)] p-3">
-      <dt>{label}</dt>
-      <dd className="mt-1 text-xl leading-7 font-bold tabular-nums">{fmt(value)}</dd>
-    </div>
-  );
+/** Extras the page must load without: a failure just leaves that part out. */
+async function readOptional<T>(url: string): Promise<T | null> {
+  try {
+    const res = await fetch(url, { cache: "no-store" });
+    return res.ok ? ((await res.json()) as T) : null;
+  } catch {
+    return null;
+  }
 }
 
-function SetupStep({
-  step,
-  active = false,
-  children,
-}: {
-  step: number;
-  active?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <li className="flex items-start gap-3">
-      <span
-        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-          active
-            ? "bg-[var(--av2-accent-strong)] text-white"
-            : "bg-[var(--av2-surface)] text-[var(--av2-text-2)] ring-1 ring-[var(--av2-border)]"
-        }`}
-      >
-        {step}
-      </span>
-      <span>{children}</span>
-    </li>
-  );
-}
+const SHORTCUTS = [
+  {
+    href: "/creative/moodboards",
+    title: "Moodboards",
+    text: "Find your direction",
+    icon: <IconMoodboards width={24} height={24} />,
+    tone: "lavender" as const,
+  },
+  {
+    href: "/colors",
+    title: "Color Studio",
+    text: "Build a palette",
+    icon: <IconColorStudio width={24} height={24} />,
+    tone: "green" as const,
+  },
+  {
+    href: "/creative/portfolio",
+    title: "Portfolio",
+    text: "Your approved work",
+    icon: <IconPortfolio width={24} height={24} />,
+    tone: "peach" as const,
+  },
+  {
+    href: allToolsHref("creative"),
+    title: "All tools",
+    text: "Explore your workspace",
+    icon: <IconTools width={24} height={24} />,
+    tone: "lavender" as const,
+  },
+];
 
 const SETUP_LINK = "font-medium text-[var(--av2-link)] hover:underline";
 
-export default function CreativeDashboardPage() {
-  const [state, setState] = useState<DashboardState>({ status: "loading" });
-  const [jobsFilter, setJobsFilter] = useState<NextJobsFilter>("ALL");
+function PayoutTierCard({ tier }: { tier: PayoutTierResponse }) {
+  const next = tier.tiers.find((t) => !t.qualified) ?? null;
+  const progress =
+    next && next.minCompletedTickets > 0
+      ? Math.min(Math.round((next.completedInWindow / next.minCompletedTickets) * 100), 100)
+      : 100;
+  const toGo = next ? Math.max(next.minCompletedTickets - next.completedInWindow, 0) : 0;
+
+  return (
+    <section className="rounded-2xl border border-[#e2dbf7] bg-[var(--av2-lavender-bg)] p-6 dark:border-[#352d57]">
+      <h2 className="text-[22px] leading-7 font-semibold">
+        {next ? "Your next payout tier" : "Top payout tier reached"}
+      </h2>
+      {next ? (
+        <>
+          <p className="mt-1 text-[15px] text-[var(--av2-text-2)]">
+            {fmt(next.completedInWindow)} of {fmt(next.minCompletedTickets)} approved requests
+          </p>
+          <span
+            role="progressbar"
+            aria-label={`Progress to ${next.name}`}
+            aria-valuenow={progress}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            className="mt-3 block h-3 overflow-hidden rounded-full bg-[var(--av2-surface)]"
+          >
+            <span
+              className="block h-full rounded-full bg-[#5b4fc4] dark:bg-[#8f80e8]"
+              style={{ width: `${progress}%` }}
+            />
+          </span>
+          <p className="mt-4 text-2xl leading-8 font-semibold text-[#4a3fa8] dark:text-[#b8adf7]">
+            {fmt(toGo)} {plural(toGo, "approval", "approvals")} to go
+          </p>
+        </>
+      ) : (
+        <p className="mt-1 text-[15px] text-[var(--av2-text-2)]">
+          You earn the highest rate on every approved request.
+        </p>
+      )}
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-base font-medium tabular-nums">
+          {next
+            ? `${tier.currentPayoutPercent}% → ${next.payoutPercent}%`
+            : `${tier.currentPayoutPercent}%`}
+        </p>
+        <TextLink href="/creative/settings?tab=payout" arrow={false}>
+          <span className="inline-flex items-center gap-1.5 font-semibold">
+            View tiers
+            <IconArrowRight width={16} height={16} />
+          </span>
+        </TextLink>
+      </div>
+    </section>
+  );
+}
+
+export default function CreativeHomePage() {
+  const [state, setState] = useState<HomeState>({ status: "loading" });
 
   const [liveTick, setLiveTick] = useState(0);
   const liveRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
-
-    const load = async () => {
-      if (!liveRef.current) setState({ status: "loading" });
-
+    (async () => {
       try {
-        const [balanceRes, ticketsRes, withdrawalsRes, payoutTierRes, skillsRes, progressRes] =
-          await Promise.all([
-            fetch("/api/creative/balance"),
-            fetch("/api/creative/tickets"),
-            fetch("/api/creative/withdrawals"),
-            fetch("/api/creative/payout-tier"),
-            fetch("/api/creative/skills"),
-            // Optional extra: the overview must load without it.
-            fetch("/api/creative/progress").catch(() => null),
-          ]);
-
-        const [balanceJson, ticketsJson, withdrawalsJson, payoutTierJson, skillsJson] =
-          await Promise.all([
-            balanceRes.json().catch(() => null),
-            ticketsRes.json().catch(() => null),
-            withdrawalsRes.json().catch(() => null),
-            payoutTierRes.json().catch(() => null),
-            skillsRes.json().catch(() => null),
-          ]);
-        const progressJson = progressRes?.ok ? await progressRes.json().catch(() => null) : null;
-
-        if (!balanceRes.ok) {
-          const message =
-            (balanceJson as any)?.error ||
-            `Balance request failed with status ${balanceRes.status}`;
-          throw new Error(message);
-        }
-
-        if (!ticketsRes.ok) {
-          const message =
-            (ticketsJson as any)?.error || `Requests fetch failed with status ${ticketsRes.status}`;
-          throw new Error(message);
-        }
-
-        if (!withdrawalsRes.ok) {
-          const message =
-            (withdrawalsJson as any)?.error ||
-            `Withdrawals request failed with status ${withdrawalsRes.status}`;
-          throw new Error(message);
-        }
-
+        const [balance, tickets, withdrawals, payoutTier, skills, moodboards] = await Promise.all([
+          readJson<BalanceResponse>("/api/creative/balance", "Balance"),
+          readJson<TicketsResponse>("/api/creative/tickets", "Requests"),
+          readJson<WithdrawalsResponse>("/api/creative/withdrawals", "Withdrawals"),
+          readOptional<PayoutTierResponse>("/api/creative/payout-tier"),
+          readOptional<{ selectedJobTypeIds?: string[] }>("/api/creative/skills"),
+          readOptional<{ moodboards: { id: string; title: string; updatedAt: string }[] }>(
+            "/api/moodboards",
+          ),
+        ]);
         if (cancelled) return;
-
-        const selectedSkills = skillsRes.ok ? ((skillsJson as any)?.selectedJobTypeIds ?? []) : [];
-
         setState({
           status: "ready",
+          // Read in the browser with the data: the server can't know the creative's time of day.
+          now: new Date(),
           data: {
-            balance: balanceJson as CreativeBalanceResponse,
-            tickets: ticketsJson as CreativeTicketsResponse,
-            withdrawals: withdrawalsJson as CreativeWithdrawalsResponse,
-            payoutTier: payoutTierRes.ok ? (payoutTierJson as PayoutTierResponse) : null,
-            skillCount: selectedSkills.length,
-            firstPassStreak:
-              (progressJson as any)?.enabled === true
-                ? Number((progressJson as any).firstPassStreak ?? 0)
-                : null,
+            balance,
+            tickets,
+            withdrawals,
+            payoutTier,
+            skillCount: skills ? (skills.selectedJobTypeIds?.length ?? 0) : null,
+            moodboards: (moodboards?.moodboards ?? []).map((m) => ({
+              id: m.id,
+              title: m.title,
+              updatedAt: m.updatedAt,
+            })),
           },
         });
-      } catch (err: any) {
+      } catch (err) {
         if (liveRef.current) return; // background refresh: keep what's on screen
-        console.error("[CreativeDashboard] load error", err);
+        console.error("[CreativeHome] load error", err);
         if (!cancelled) {
           setState({
             status: "error",
-            message: err?.message || "Failed to load creative overview. Please try again.",
+            message: err instanceof Error ? err.message : "Failed to load your home page.",
           });
         }
       }
-    };
-
-    load();
-
+    })();
     return () => {
       cancelled = true;
     };
@@ -319,506 +281,214 @@ export default function CreativeDashboardPage() {
   });
 
   const data = state.status === "ready" ? state.data : null;
-
-  const user = data?.balance.user ?? null;
-  const tokenBalance = data?.balance.balance ?? null;
-  const lastLedgerEntry = data?.balance.ledger[0] ?? null;
-
-  const ticketStats = data?.tickets.stats ?? null;
-  const totalTickets = ticketStats?.total ?? 0;
-  const doneTickets = ticketStats?.byStatus.DONE ?? 0;
-  const openTickets =
-    ticketStats?.openTotal != null
-      ? ticketStats.openTotal
-      : totalTickets > 0
-        ? totalTickets - doneTickets
-        : 0;
-  const loadScore = ticketStats?.loadScore ?? null;
-
-  const creativeTickets = useMemo(() => data?.tickets.tickets ?? [], [data]);
-  const dueJobs = useMemo(
-    () =>
-      creativeTickets
-        .filter((t) => t.dueDate != null && t.status !== "DONE")
-        .sort((a, b) => new Date(a.dueDate!).getTime() - new Date(b.dueDate!).getTime()),
-    [creativeTickets],
-  );
-  const nextJobs = dueJobs
-    .filter((t) => jobsFilter === "ALL" || t.status === jobsFilter)
-    .slice(0, NEXT_JOBS_LIMIT);
-
+  const now = state.status === "ready" ? state.now : null;
+  const stats = data?.tickets.stats ?? null;
+  const active = stats ? (stats.openTotal ?? stats.total - (stats.byStatus.DONE ?? 0)) : 0;
   const payoutTier = data?.payoutTier ?? null;
-  // null while the owner's "Creative progress" switch is off.
-  const firstPassStreak = data?.firstPassStreak ?? null;
-  const nextTier = payoutTier?.tiers.find((t) => !t.qualified) ?? null;
-  const nextTierProgress =
-    nextTier && nextTier.minCompletedTickets > 0
-      ? Math.min(Math.round((nextTier.completedInWindow / nextTier.minCompletedTickets) * 100), 100)
-      : 0;
+  const latestWithdrawal = data?.withdrawals.withdrawals[0] ?? null;
+  const firstName = data?.balance.user.name?.trim().split(/\s+/)[0] ?? null;
 
-  const withdrawalStats = data?.withdrawals.stats ?? null;
-  const recentWithdrawals = data?.withdrawals.withdrawals.slice(0, 3) ?? [];
+  const tickets = useMemo<HomeTicket[]>(
+    () =>
+      (data?.tickets.tickets ?? []).map((t) => ({
+        id: t.id,
+        title: t.title,
+        status: t.status,
+        dueDate: t.dueDate,
+        createdAt: t.createdAt,
+        updatedAt: t.updatedAt,
+        revisionRequested: Boolean(t.latestRevisionHasFeedback),
+        code: buildTicketCode({
+          projectCode: t.project?.code,
+          companyTicketNumber: t.companyTicketNumber,
+          ticketId: t.id,
+        }),
+      })),
+    [data],
+  );
 
-  const band = loadScore != null ? loadBand(loadScore) : null;
-  const gaugeValue = Math.min(Math.max(loadScore ?? 0, 0), 100);
+  const moves = useMemo(() => creativeMoves(tickets), [tickets]);
+  const shownMoves: AttentionItem[] = moves.slice(0, REMINDER_LIMIT).map((move) => ({
+    key: move.key,
+    title: move.title,
+    detail: move.detail,
+    badge: move.badge,
+    action: move.action,
+    tone: move.kind === "revision" ? "peach" : "lavender",
+    icon: <IconTicket />,
+  }));
+  const inProgress = moves.find((move) => move.kind === "revision" || move.kind === "inProgress");
+
+  const recent = useMemo<RecentCard[]>(() => {
+    if (!data || !now) return [];
+    return recentWork({ role: "creative", tickets, moodboards: data.moodboards, now }).map(
+      (item) => ({
+        key: item.key,
+        title: item.title,
+        href: item.href,
+        badge: item.badge,
+        detail: item.detail,
+        tone: item.kind === "moodboard" ? "lavender" : "peach",
+        icon:
+          item.kind === "moodboard" ? <IconMoodboards width={24} height={24} /> : <IconTicket />,
+      }),
+    );
+  }, [data, now, tickets]);
+
+  const slot = useHeroSlot();
+  const greeting = slot ? HERO_GREETING[slot] : "Welcome";
 
   return (
     <>
-      <PageHeader
-        title="Overview"
-        meta={
-          user ? (
+      <PauseBanner />
+
+      <HomeHero
+        slot={slot}
+        loading={state.status === "loading"}
+        date={
+          now
+            ? now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
+            : null
+        }
+        title={firstName ? `${greeting}, ${firstName}` : greeting}
+        tagline="Your next creative chapter is waiting."
+        stats={
+          data ? (
             <>
-              Signed in as{" "}
-              <span className="font-medium text-[var(--av2-text)]">{user.name || user.email}</span>
+              <HeroStat icon={<IconTicket />} tone="green" href="/creative/board">
+                {fmt(active)} active {plural(active, "request", "requests")}
+              </HeroStat>
+              <HeroStat icon={<IconCoins />} tone="lavender" href="/creative/balance">
+                {formatTokens(data.balance.balance)} balance
+              </HeroStat>
+              {payoutTier ? (
+                <HeroStat icon={<IconLayers />} tone="green" href="/creative/stats">
+                  {payoutTier.currentPayoutPercent}% payout rate
+                </HeroStat>
+              ) : null}
+            </>
+          ) : null
+        }
+        actions={
+          data ? (
+            <>
+              <ButtonLink href="/creative/board" variant="primary">
+                Open board
+                <IconArrowRight />
+              </ButtonLink>
+              {inProgress ? (
+                <ButtonLink href={inProgress.action.href}>Upload a delivery</ButtonLink>
+              ) : null}
             </>
           ) : null
         }
       />
 
-      <PauseBanner />
-
       {state.status === "error" ? (
-        <Callout tone="error" title="We couldn't load your overview">
+        <Callout tone="error" title="We couldn't load your home page">
           {state.message}
         </Callout>
       ) : state.status === "loading" ? (
-        <div aria-busy="true" aria-label="Loading overview" className="space-y-6">
-          <div className="grid gap-6 lg:grid-cols-2 2xl:grid-cols-4">
-            <Skeleton className="h-48" />
-            <Skeleton className="h-48" />
-            <Skeleton className="h-48" />
-            <Skeleton className="h-48" />
-          </div>
-          <Skeleton className="h-32" />
+        <div aria-busy="true" aria-label="Loading your home page" className="space-y-6">
+          <Skeleton className="h-20" />
           <Skeleton className="h-64" />
+          <Skeleton className="h-40" />
         </div>
       ) : (
         <div className="space-y-6">
-          {/* Welcome / setup guide for new creatives */}
           {data?.skillCount === 0 ? (
             <section className="rounded-2xl border border-[var(--av2-attention-border)] bg-gradient-to-r from-[var(--av2-attention-from)] to-[var(--av2-attention-to)] p-6">
               <h2 className="text-xl leading-7 font-semibold">Welcome to brandbite!</h2>
               <p className="mt-1 text-base text-[var(--av2-text-2)]">
                 Set up your profile to start receiving request assignments:
               </p>
-              <ol className="mt-4 space-y-3 text-sm">
-                <SetupStep step={1} active>
+              <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm">
+                <li>
                   <Link href="/creative/settings" className={SETUP_LINK}>
                     Select your skills
                   </Link>{" "}
                   so we can match you with the right requests
-                </SetupStep>
-                <SetupStep step={2}>
-                  Wait for request assignments to appear on your{" "}
+                </li>
+                <li>
+                  Wait for request assignments to appear here and on your{" "}
                   <Link href="/creative/board" className={SETUP_LINK}>
                     board
                   </Link>
-                </SetupStep>
-                <SetupStep step={3}>
+                </li>
+                <li>
                   Complete requests, earn tokens, and{" "}
                   <Link href="/creative/withdrawals" className={SETUP_LINK}>
                     withdraw your earnings
                   </Link>
-                </SetupStep>
+                </li>
               </ol>
             </section>
           ) : null}
 
-          {/* Headline numbers */}
-          <div className="grid gap-6 lg:grid-cols-2 2xl:grid-cols-4">
-            <MoneyStat
-              icon={<IconCoins />}
-              tone="green"
-              label="Token balance"
-              action={
-                <TextLink href="/creative/balance" arrow={false}>
-                  View balance
-                </TextLink>
-              }
-              value={<TokenFigure value={tokenBalance} />}
-            >
-              {lastLedgerEntry ? (
-                <div className="rounded-xl bg-[var(--av2-bg)] px-3 py-3 text-sm">
-                  <p className="font-medium">Last activity</p>
-                  <p className="mt-1 text-[var(--av2-text-2)]">
-                    {lastLedgerEntry.direction === "CREDIT" ? "Credited" : "Debited"}{" "}
-                    {formatTokens(lastLedgerEntry.amount)} on{" "}
-                    {formatDate(lastLedgerEntry.createdAt)}.
-                  </p>
-                </div>
-              ) : null}
-            </MoneyStat>
+          <ShortcutCards items={SHORTCUTS} />
 
-            <MoneyStat
-              icon={<IconTicket />}
-              tone="lavender"
-              label="Active requests"
-              action={
-                <TextLink href="/creative/board" arrow={false}>
-                  Open board
-                </TextLink>
-              }
-              value={
-                <>
-                  {fmt(openTickets)}{" "}
-                  <span className="text-xl font-medium text-[var(--av2-text-2)]">
-                    of {fmt(totalTickets)}
-                  </span>
-                </>
-              }
-            >
-              {ticketStats ? (
-                <dl className="space-y-2 rounded-xl bg-[var(--av2-bg)] px-3 py-3">
-                  {OPEN_STATUSES.map((s) => (
-                    <div key={s} className="flex items-center justify-between gap-3">
-                      <dt>
-                        <StatusDot tone={TICKET_STATUS[s].tone} label={TICKET_STATUS[s].label} />
-                      </dt>
-                      <dd className="text-sm font-bold tabular-nums">
-                        {fmt(ticketStats.byStatus[s] ?? 0)}
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
-              ) : null}
-            </MoneyStat>
-
-            <MoneyStat
-              icon={<IconWallet />}
-              tone="peach"
-              label="Available to request"
-              action={
-                <TextLink href="/creative/withdrawals" arrow={false}>
-                  Request payout
-                </TextLink>
-              }
-              value={<TokenFigure value={withdrawalStats?.spendableBalance} />}
-            >
-              <div className="grid grid-cols-2 gap-2">
-                <MiniStat value={fmt(withdrawalStats?.reservedTokens)} label="Held for requests" />
-                <MiniStat value={fmt(withdrawalStats?.pendingCount)} label="Pending" />
-                <MiniStat value={fmt(withdrawalStats?.totalRequested)} label="Total requested" />
-                <MiniStat
-                  value={fmt(withdrawalStats?.withdrawalsCount)}
-                  label="Requests all time"
-                />
-              </div>
-            </MoneyStat>
-
-            <MoneyStat
-              icon={<IconDocument />}
-              tone="green"
-              label="Current payout rate"
-              action={
-                <TextLink href="/creative/settings?tab=payout" arrow={false}>
-                  View tiers
-                </TextLink>
-              }
-              value={payoutTier ? `${payoutTier.currentPayoutPercent}%` : DASH}
-              hint={payoutTier ? (payoutTier.currentTierName ?? "Base rate") : undefined}
-            >
-              {payoutTier && payoutTier.tiers.length > 0 ? (
-                <div className="rounded-xl bg-[var(--av2-bg)] px-3 py-3 text-sm">
-                  {nextTier ? (
-                    <>
-                      <p className="font-medium">
-                        Next: {nextTier.name} ({nextTier.payoutPercent}%)
-                      </p>
-                      <span
-                        role="progressbar"
-                        aria-label={`Progress to ${nextTier.name}`}
-                        aria-valuenow={nextTierProgress}
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                        className="mt-2 block h-2 w-full overflow-hidden rounded-full bg-[var(--av2-track)]"
-                      >
-                        <span
-                          className="block h-full rounded-full bg-[var(--av2-fill-lavender)]"
-                          style={{ width: `${nextTierProgress}%` }}
-                        />
-                      </span>
-                      <p className="mt-2 flex flex-wrap justify-between gap-x-3 text-xs text-[var(--av2-text-2)] tabular-nums">
-                        <span>
-                          {fmt(nextTier.completedInWindow)} / {fmt(nextTier.minCompletedTickets)}{" "}
-                          approved requests
-                        </span>
-                        {firstPassStreak !== null ? (
-                          <span>
-                            {fmt(
-                              Math.max(
-                                nextTier.minCompletedTickets - nextTier.completedInWindow,
-                                0,
-                              ),
-                            )}{" "}
-                            to go · {nextTierProgress}%
-                          </span>
-                        ) : null}
-                      </p>
-                    </>
-                  ) : (
-                    <p className="font-medium">Max tier reached</p>
-                  )}
-                </div>
-              ) : null}
-            </MoneyStat>
-          </div>
-
-          {/* Workload breakdowns */}
-          {ticketStats && totalTickets > 0 ? (
-            <div
-              className={`grid gap-6 ${
-                firstPassStreak !== null
-                  ? "lg:grid-cols-2 2xl:grid-cols-[1fr_1fr_minmax(280px,0.8fr)]"
-                  : "lg:grid-cols-2"
-              }`}
-            >
-              <Card>
-                <CardTitle description="All your requests by workflow stage.">Workflow</CardTitle>
-                <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  {STATUS_ORDER.map((s) => (
-                    <CountTile
-                      key={s}
-                      label={
-                        <StatusDot tone={TICKET_STATUS[s].tone} label={TICKET_STATUS[s].label} />
-                      }
-                      value={ticketStats.byStatus[s] ?? 0}
-                    />
-                  ))}
-                </dl>
-              </Card>
-              <Card>
-                <CardTitle description="All your requests by priority, including done ones.">
-                  Priority breakdown
-                </CardTitle>
-                <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  {PRIORITY_ORDER.map((p) => (
-                    <CountTile
-                      key={p}
-                      label={<StatusDot tone={PRIORITY[p].tone} label={PRIORITY[p].label} />}
-                      value={ticketStats.byPriority[p] ?? 0}
-                    />
-                  ))}
-                </dl>
-              </Card>
-              {firstPassStreak !== null ? (
-                <div className="lg:col-span-2 2xl:col-span-1 [&>section]:h-full">
-                  <FirstPassStreakCard streak={firstPassStreak} />
-                </div>
-              ) : null}
-            </div>
-          ) : firstPassStreak !== null ? (
-            <FirstPassStreakCard streak={firstPassStreak} />
-          ) : null}
-
-          {/* Upcoming deadlines */}
-          {creativeTickets.length > 0 ? (
-            <Card padding="none">
-              <div className="flex flex-wrap items-start justify-between gap-4 px-6 pt-6">
-                <div className="flex min-w-[240px] flex-1 items-center gap-4">
-                  <IconTile tone="peach" round>
-                    <IconDocument />
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,8fr)_minmax(0,5fr)] [&>*:only-child]:lg:col-span-2">
+            <AttentionList
+              title="Your next moves"
+              items={shownMoves}
+              total={moves.length}
+              empty={
+                <div className="flex flex-col items-center px-4 pt-6 pb-2 text-center">
+                  <IconTile tone="green" size={48} round>
+                    <IconCheck />
                   </IconTile>
-                  <div className="min-w-0">
-                    <h2 className="text-xl leading-7 font-semibold">Your next requests</h2>
-                    <p className="text-sm text-[var(--av2-text-2)]">
-                      Your assigned requests with due dates, soonest first.
-                    </p>
-                  </div>
-                </div>
-                <ButtonLink href="/creative/board" variant="primary">
-                  Open board
-                  <IconArrowUpRight />
-                </ButtonLink>
-              </div>
-
-              {dueJobs.length === 0 ? (
-                <EmptyState title="No upcoming deadlines." />
-              ) : (
-                <>
-                  <div className="px-6 pt-4 pb-4">
-                    <FilterChips
-                      label="Filter next requests by status"
-                      options={[
-                        { value: "ALL" as NextJobsFilter, label: "All", count: dueJobs.length },
-                        ...OPEN_STATUSES.map((s) => ({
-                          value: s as NextJobsFilter,
-                          label: TICKET_STATUS[s].label,
-                          count: dueJobs.filter((t) => t.status === s).length,
-                        })),
-                      ]}
-                      value={jobsFilter}
-                      onChange={setJobsFilter}
-                    />
-                  </div>
-                  {nextJobs.length === 0 ? (
-                    <EmptyState title="No requests with a due date in this status." />
-                  ) : (
-                    <Table label="Your next requests">
-                      <thead>
-                        <tr>
-                          <Th className="max-sm:hidden">ID</Th>
-                          <Th>Request</Th>
-                          <Th className="max-md:hidden">Status</Th>
-                          <Th className="max-md:hidden">Priority</Th>
-                          <Th>Due date</Th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {nextJobs.map((t) => {
-                          const countdown = formatDueDateCountdown(t.dueDate);
-                          const overdue = isDueDateOverdue(t.dueDate);
-                          const soon = isDueDateSoon(t.dueDate);
-                          const status = TICKET_STATUS[t.status];
-                          const priority = PRIORITY[t.priority];
-                          return (
-                            <tr
-                              key={t.id}
-                              className="border-b border-[var(--av2-border)] last:border-b-0"
-                            >
-                              <Td className="whitespace-nowrap text-[var(--av2-text-2)] max-sm:hidden">
-                                {buildTicketCode({
-                                  projectCode: t.project?.code,
-                                  companyTicketNumber: t.companyTicketNumber,
-                                  ticketId: t.id,
-                                })}
-                              </Td>
-                              <Td>
-                                <Link
-                                  href={`/creative/tickets/${t.id}`}
-                                  className="font-medium hover:underline"
-                                >
-                                  {t.title}
-                                </Link>
-                                {t.company ? (
-                                  <p className="mt-0.5 text-xs text-[var(--av2-text-2)]">
-                                    {t.company.name}
-                                  </p>
-                                ) : null}
-                                <div className="mt-1 flex flex-wrap gap-1 md:hidden">
-                                  <Badge tone={status.tone} dot>
-                                    {status.label}
-                                  </Badge>
-                                  <Badge tone={priority.tone}>{priority.label}</Badge>
-                                </div>
-                              </Td>
-                              <Td className="max-md:hidden">
-                                <Badge tone={status.tone} dot>
-                                  {status.label}
-                                </Badge>
-                              </Td>
-                              <Td className="max-md:hidden">
-                                <Badge tone={priority.tone}>{priority.label}</Badge>
-                              </Td>
-                              <Td>
-                                <p className="whitespace-nowrap">{formatDate(t.dueDate)}</p>
-                                {countdown ? (
-                                  overdue ? (
-                                    <Badge tone="red" className="mt-1">
-                                      {countdown.label}
-                                    </Badge>
-                                  ) : soon ? (
-                                    <Badge tone="amber" className="mt-1">
-                                      {countdown.label}
-                                    </Badge>
-                                  ) : (
-                                    <p className="mt-0.5 text-xs text-[var(--av2-text-2)]">
-                                      {countdown.label}
-                                    </p>
-                                  )
-                                ) : null}
-                              </Td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </Table>
-                  )}
-                </>
-              )}
-            </Card>
-          ) : null}
-
-          {/* Load score + recent withdrawals */}
-          <div className="grid gap-6 lg:grid-cols-2">
-            <Card>
-              <CardTitle>Load score</CardTitle>
-              <div className="mt-4 flex flex-wrap items-center gap-6">
-                <div className="relative flex h-28 w-28 shrink-0 items-center justify-center">
-                  <svg
-                    role="img"
-                    aria-label={`Load score ${fmt(loadScore)}${band ? `, ${band.label}` : ""}`}
-                    className="h-full w-full -rotate-90"
-                    viewBox="0 0 36 36"
-                  >
-                    <circle
-                      cx="18"
-                      cy="18"
-                      r="15.9155"
-                      fill="none"
-                      stroke="var(--av2-track)"
-                      strokeWidth="3"
-                    />
-                    {band ? (
-                      <circle
-                        cx="18"
-                        cy="18"
-                        r="15.9155"
-                        fill="none"
-                        stroke={band.color}
-                        strokeWidth="3"
-                        strokeDasharray={`${gaugeValue} ${100 - gaugeValue}`}
-                        strokeLinecap="round"
-                      />
-                    ) : null}
-                  </svg>
-                  <span aria-hidden className="absolute text-2xl leading-8 font-bold tabular-nums">
-                    {fmt(loadScore)}
-                  </span>
-                </div>
-                <div className="min-w-[200px] flex-1">
-                  {band ? <p className="text-xl leading-7 font-semibold">{band.label}</p> : null}
-                  <p className="mt-1 text-sm text-[var(--av2-text-2)]">
-                    Weighted from the priority and token cost of your open requests. Below 50 is
-                    light, 50-80 is moderate, above 80 is heavy.
+                  <p className="mt-3 text-base font-semibold">No open requests right now</p>
+                  <p className="mt-1 max-w-sm text-sm text-[var(--av2-text-2)]">
+                    New assignments, revisions and due dates show up here.
                   </p>
                 </div>
+              }
+              footer={
+                moves.length > shownMoves.length ? (
+                  <p className="mt-3 text-sm text-[var(--av2-text-2)]">
+                    And {moves.length - shownMoves.length} more.{" "}
+                    <TextLink href="/creative/board" arrow={false}>
+                      Open board
+                    </TextLink>
+                  </p>
+                ) : null
+              }
+            />
+            {(payoutTier && payoutTier.tiers.length > 0) || latestWithdrawal ? (
+              <div className="min-w-0 space-y-4">
+                {payoutTier && payoutTier.tiers.length > 0 ? (
+                  <PayoutTierCard tier={payoutTier} />
+                ) : null}
+                {latestWithdrawal ? (
+                  <section className="flex flex-wrap items-center gap-4 rounded-2xl border border-[var(--av2-border)] bg-[var(--av2-surface)] p-5">
+                    <IconTile tone="green" size={44} round>
+                      <IconWallet />
+                    </IconTile>
+                    <div className="min-w-[140px] flex-1">
+                      <h2 className="flex flex-wrap items-center gap-2 text-[17px] leading-6 font-semibold">
+                        Latest withdrawal
+                        <WithdrawalBadge status={latestWithdrawal.status} />
+                      </h2>
+                      <p className="mt-0.5 text-sm text-[var(--av2-text-2)]">
+                        {formatTokens(latestWithdrawal.amountTokens)} ·{" "}
+                        {formatDate(latestWithdrawal.createdAt)}
+                      </p>
+                    </div>
+                    <ArrowLink href="/creative/withdrawals">View withdrawals</ArrowLink>
+                  </section>
+                ) : null}
               </div>
-            </Card>
-
-            <Card>
-              <CardTitle
-                description="Your latest payout requests."
-                action={
-                  <TextLink href="/creative/withdrawals" arrow={false}>
-                    View all
-                  </TextLink>
-                }
-              >
-                Recent withdrawals
-              </CardTitle>
-              {recentWithdrawals.length > 0 ? (
-                <ul className="mt-4 space-y-2">
-                  {recentWithdrawals.map((w) => (
-                    <li
-                      key={w.id}
-                      className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-[var(--av2-bg)] px-4 py-3"
-                    >
-                      <div className="min-w-0">
-                        <p className="font-semibold tabular-nums">{formatTokens(w.amountTokens)}</p>
-                        <p className="text-sm text-[var(--av2-text-2)]">
-                          {formatDate(w.createdAt)}
-                        </p>
-                      </div>
-                      <WithdrawalBadge status={w.status} />
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="mt-4 text-sm text-[var(--av2-text-2)]">No withdrawal requests yet.</p>
-              )}
-            </Card>
+            ) : null}
           </div>
+
+          {recent.length > 0 ? (
+            <section aria-labelledby="home-recent">
+              <h2 id="home-recent" className="mb-3 text-[22px] leading-7 font-semibold">
+                Pick up where you left off
+              </h2>
+              <RecentCards items={recent} />
+            </section>
+          ) : null}
         </div>
       )}
     </>

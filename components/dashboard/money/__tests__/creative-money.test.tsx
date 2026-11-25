@@ -2,7 +2,8 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import CreativeBalancePage from "@/app/creative/balance/page";
-import CreativeDashboardPage from "@/app/creative/page";
+import CreativeHomePage from "@/app/creative/page";
+import CreativeStatsPage from "@/app/creative/stats/page";
 import CreativePortfolioPage from "@/app/creative/portfolio/page";
 import CreativeWithdrawalsPage from "@/app/creative/withdrawals/page";
 
@@ -170,10 +171,10 @@ afterEach(() => {
   showToast.mockClear();
 });
 
-describe("Creative overview", () => {
+describe("Creative stats", () => {
   it("labels balance, held and requestable amounts separately", async () => {
     mockApi({ stats: { availableBalance: 10, reservedTokens: 7, spendableBalance: 3 } });
-    render(<CreativeDashboardPage />);
+    render(<CreativeStatsPage />);
     const requestable = (await screen.findByText("Available to request")).closest("section")!;
     expect(within(requestable).getByText("3")).toBeInTheDocument();
     expect(within(requestable).getByText("Held for requests")).toBeInTheDocument();
@@ -182,17 +183,14 @@ describe("Creative overview", () => {
     expect(within(balance).getByText("10")).toBeInTheDocument();
   });
 
-  it("keeps load score, payout tier, priorities, deadlines and withdrawals", async () => {
+  it("keeps load score, payout tier, priorities and withdrawals", async () => {
     mockApi();
-    render(<CreativeDashboardPage />);
+    render(<CreativeStatsPage />);
     expect(await screen.findByRole("img", { name: "Load score 72, Moderate" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Stats" })).toBeInTheDocument();
     expect(screen.getByText("60%")).toBeInTheDocument();
     expect(screen.getByText("Next: Silver Tier (65%)")).toBeInTheDocument();
     expect(screen.getByText("Priority breakdown")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Logo redesign" })).toHaveAttribute(
-      "href",
-      "/creative/tickets/t1",
-    );
     const recent = screen.getByText("Recent withdrawals").closest("section")!;
     expect(within(recent).getByText("Approved")).toBeInTheDocument();
     expect(within(recent).queryByText("Paid")).toBeNull();
@@ -200,7 +198,7 @@ describe("Creative overview", () => {
 
   it("shows the first-pass streak only when the owner switched it on", async () => {
     mockApi({ streak: 4 });
-    const { unmount } = render(<CreativeDashboardPage />);
+    const { unmount } = render(<CreativeStatsPage />);
     expect(await screen.findByText("First-pass streak")).toBeInTheDocument();
     expect(screen.getByText("4 in a row")).toBeInTheDocument();
     expect(screen.getByText(/50 to go/)).toBeInTheDocument();
@@ -208,48 +206,14 @@ describe("Creative overview", () => {
 
     vi.restoreAllMocks();
     mockApi();
-    render(<CreativeDashboardPage />);
+    render(<CreativeStatsPage />);
     expect(await screen.findByText("Priority breakdown")).toBeInTheDocument();
     expect(screen.queryByText("First-pass streak")).toBeNull();
   });
 
-  it("filters next jobs by status and leaves done work out", async () => {
-    mockApi({
-      tickets: [
-        job({ id: "a", title: "Backlog job", status: "TODO" }),
-        job({ id: "b", title: "Active job", status: "IN_PROGRESS" }),
-        job({ id: "c", title: "Finished job", status: "DONE" }),
-      ],
-    });
-    render(<CreativeDashboardPage />);
-    expect(await screen.findByRole("link", { name: "Backlog job" })).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Finished job" })).toBeNull();
-    const chips = screen.getByRole("group", { name: "Filter next requests by status" });
-    fireEvent.click(within(chips).getByRole("button", { name: /In progress/ }));
-    expect(screen.getByRole("link", { name: "Active job" })).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Backlog job" })).toBeNull();
-  });
-
-  it("flags overdue work from the real due date", async () => {
-    mockApi({ tickets: [job({ dueDate: "2020-01-02T12:00:00.000Z" })] });
-    render(<CreativeDashboardPage />);
-    expect(await screen.findByText(/days overdue/)).toBeInTheDocument();
-    expect(screen.queryByText(/sample date/i)).toBeNull();
-  });
-
-  it("shows the setup guide to creatives with no skills", async () => {
-    mockApi({ skills: [] });
-    render(<CreativeDashboardPage />);
-    expect(await screen.findByText("Welcome to brandbite!")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Select your skills" })).toHaveAttribute(
-      "href",
-      "/creative/settings",
-    );
-  });
-
   it("dashes the payout rate when its optional request fails", async () => {
     mockApi({ failPayoutTier: true });
-    render(<CreativeDashboardPage />);
+    render(<CreativeStatsPage />);
     const card = (await screen.findByText("Current payout rate")).closest("section")!;
     expect(within(card).getByText("—")).toBeInTheDocument();
   });
@@ -257,7 +221,104 @@ describe("Creative overview", () => {
   it("explains a failed load", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     mockApi({ failBalance: true });
-    render(<CreativeDashboardPage />);
+    render(<CreativeStatsPage />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("Balance is down");
+  });
+});
+
+describe("Creative home", () => {
+  it("greets by first name with active requests, balance and payout rate", async () => {
+    mockApi();
+    render(<CreativeHomePage />);
+    expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent(/, Ada$/);
+    expect(screen.getByRole("link", { name: "2 active requests" })).toHaveAttribute(
+      "href",
+      "/creative/board",
+    );
+    expect(screen.getByRole("link", { name: "10 tokens balance" })).toHaveAttribute(
+      "href",
+      "/creative/balance",
+    );
+    expect(screen.getByRole("link", { name: "60% payout rate" })).toHaveAttribute(
+      "href",
+      "/creative/stats",
+    );
+  });
+
+  it("orders the next moves: revisions, work in progress, new assignments", async () => {
+    mockApi({
+      tickets: [
+        job({ id: "a", title: "Backlog job", status: "TODO" }),
+        job({ id: "b", title: "Active job", status: "IN_PROGRESS" }),
+        job({
+          id: "r",
+          title: "Changes wanted",
+          status: "IN_PROGRESS",
+          latestRevisionHasFeedback: true,
+        }),
+        job({ id: "c", title: "Finished job", status: "DONE" }),
+      ],
+    });
+    render(<CreativeHomePage />);
+    const moves = (await screen.findByRole("heading", { name: "Your next moves" })).closest(
+      "section",
+    )!;
+    const rows = within(moves).getAllByRole("listitem");
+    expect(rows.map((row) => within(row).getByRole("link").getAttribute("href"))).toEqual([
+      "/creative/tickets/r",
+      "/creative/tickets/b",
+      "/creative/tickets/a",
+    ]);
+    expect(within(rows[0]).getByText("Revision requested")).toBeInTheDocument();
+    expect(within(rows[2]).getByRole("link", { name: /View brief/ })).toBeInTheDocument();
+    expect(within(moves).queryByText("Finished job")).toBeNull();
+    expect(screen.getByRole("link", { name: "Upload a delivery" })).toHaveAttribute(
+      "href",
+      "/creative/tickets/r",
+    );
+  });
+
+  it("flags overdue work from the real due date", async () => {
+    mockApi({ tickets: [job({ dueDate: "2020-01-02T12:00:00.000Z" })] });
+    render(<CreativeHomePage />);
+    expect(await screen.findByText(/days overdue/)).toBeInTheDocument();
+  });
+
+  it("shows progress to the next payout tier and the latest withdrawal", async () => {
+    mockApi();
+    render(<CreativeHomePage />);
+    const tier = (await screen.findByRole("heading", { name: "Your next payout tier" })).closest(
+      "section",
+    )!;
+    expect(within(tier).getByText("0 of 50 approved requests")).toBeInTheDocument();
+    expect(within(tier).getByText("50 approvals to go")).toBeInTheDocument();
+    expect(within(tier).getByText("60% → 65%")).toBeInTheDocument();
+    const latest = screen.getByRole("heading", { name: /Latest withdrawal/ }).closest("section")!;
+    expect(within(latest).getByText("Approved")).toBeInTheDocument();
+  });
+
+  it("leaves the payout parts out when that optional request fails", async () => {
+    mockApi({ failPayoutTier: true, withdrawals: [] });
+    render(<CreativeHomePage />);
+    await screen.findByRole("heading", { name: "Your next moves" });
+    expect(screen.queryByText("Your next payout tier")).toBeNull();
+    expect(screen.queryByRole("link", { name: /payout rate/ })).toBeNull();
+  });
+
+  it("shows the setup guide to creatives with no skills", async () => {
+    mockApi({ skills: [] });
+    render(<CreativeHomePage />);
+    expect(await screen.findByText("Welcome to brandbite!")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Select your skills" })).toHaveAttribute(
+      "href",
+      "/creative/settings",
+    );
+  });
+
+  it("explains a failed load", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    mockApi({ failBalance: true });
+    render(<CreativeHomePage />);
     expect(await screen.findByRole("alert")).toHaveTextContent("Balance is down");
   });
 });

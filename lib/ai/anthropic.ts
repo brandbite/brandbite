@@ -163,3 +163,30 @@ export async function getDesignSuggestions(
     throw new Error("The design suggestions came back in a shape we couldn't read.");
   return { ...response.parsed_output, model: response.model };
 }
+
+// ---------------------------------------------------------------------------
+// Copy options (structured)
+// ---------------------------------------------------------------------------
+
+const CopyOptionsSchema = z.object({ options: z.array(z.string()) });
+
+/**
+ * Several versions of one short piece of copy, each a plain string. The
+ * caller writes both prompts (lib/brand-copy/copy.ts) and cleans the result.
+ */
+export async function writeCopyOptions(
+  systemPrompt: string,
+  prompt: string,
+): Promise<{ options: string[]; usage: TextUsage; model: string }> {
+  const response = await getAnthropicClient().beta.messages.parse({
+    ...baseParams(prompt, systemPrompt),
+    output_config: { effort: "low", format: betaZodOutputFormat(CopyOptionsSchema) },
+  });
+  if (response.stop_reason === "refusal") throw new AiRefusalError();
+  if (!response.parsed_output) throw new Error("The copy came back in a shape we couldn't read.");
+  return {
+    options: response.parsed_output.options,
+    usage: usageOf(response.usage),
+    model: response.model,
+  };
+}

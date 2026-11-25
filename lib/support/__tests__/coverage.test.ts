@@ -34,9 +34,10 @@ const APP_DIR = join(process.cwd(), "app");
 
 /** Sidebar links into the role's own dashboard; links out (e.g. /colors) aren't documented here. */
 function navHrefs(role: SupportRole, nav: NavConfig): string[] {
-  return nav.sections
-    .flatMap((section) => section.items.map((item) => item.href))
-    .filter((href) => href === `/${role}` || href.startsWith(`/${role}/`));
+  return [
+    ...nav.sections.flatMap((section) => section.items.map((item) => item.href)),
+    ...(nav.footerItems ?? []).map((item) => item.href),
+  ].filter((href) => href === `/${role}` || href.startsWith(`/${role}/`));
 }
 
 /** True if app/ has a page for this route; a [param] segment matches any dynamic folder. */

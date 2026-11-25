@@ -1,166 +1,118 @@
 // -----------------------------------------------------------------------------
 // @file: app/customer/page.tsx
-// @purpose: Customer overview: tokens, requests that need attention, upcoming work,
-//           company and plan. Everything shown comes from the customer's own data.
+// @purpose: Customer Home: a greeting banner that follows the time of day,
+//           shortcuts, what needs the customer's attention, the brand setup,
+//           recent work, last month in short and one suggestion. Everything
+//           shown comes from the customer's own data.
 // -----------------------------------------------------------------------------
 
 "use client";
 
-import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
-  IconAlertCircle,
-  IconArrowUpRight,
-  IconClock,
+  IconArrowRight,
+  IconCheck,
   IconCoins,
   IconDocument,
+  IconPlus,
   IconTicket,
-  IconUsers,
 } from "@/components/admin/v2/icons";
 import {
-  Badge,
   ButtonLink,
   Callout,
-  Card,
-  CardTitle,
-  DASH,
-  EmptyState,
+  FilterChips,
   fmt,
   IconTile,
-  KpiCard,
-  PageHeader,
   plural,
   Skeleton,
-  StatusDot,
-  Table,
-  Td,
-  Th,
   TextLink,
-  TICKET_STATUS,
-  type Tone,
 } from "@/components/admin/v2/ui";
-import { IconCatalog, IconMoodboards } from "@/components/navigation/nav-icons";
-import { isDueDateOverdue } from "@/lib/board";
+import { MonthlyRecapCard } from "@/components/engagement/monthly-recap-card";
+import { BrandReadyCard, RecapMiniCard } from "@/components/home/customer-cards";
 import {
+  ArrowLink,
+  AttentionList,
+  HeroStat,
+  HomeHero,
+  useHeroSlot,
+  RecentCards,
+  ShortcutCards,
+  type AttentionItem,
+  type RecentItem as RecentCard,
+} from "@/components/home/home-ui";
+import {
+  IconAiTools,
+  IconBrandGuide,
+  IconColorStudio,
+  IconConsultation,
+  IconMoodboards,
+} from "@/components/navigation/nav-icons";
+import { HERO_GREETING } from "@/lib/home/hero";
+import {
+  customerReminders,
+  customerSuggestion,
+  LOW_BALANCE_TOKENS,
+  recentWork,
+  REMINDER_LIMIT,
+  type HomeDraft,
+  type HomeMoodboard,
+  type HomeStatus,
+  type HomeTicket,
+} from "@/lib/home/home";
+import { useLiveRefresh } from "@/lib/hooks/use-live-refresh";
+import {
+  canBookConsultation,
   canCreateTickets,
   canEditTickets,
-  canManagePlan,
   normalizeCompanyRole,
   type CompanyRole,
 } from "@/lib/permissions/companyRoles";
 import { buildTicketCode } from "@/lib/ticket-code";
-import { useLiveRefresh } from "@/lib/hooks/use-live-refresh";
-import { IntegrationsPrompt } from "@/components/dashboard/integrations-prompt";
-import { BrandProfileCard } from "@/components/engagement/brand-profile-card";
-import { MonthlyRecapCard } from "@/components/engagement/monthly-recap-card";
-
-/** Matches the admin dashboard's definition of a low-balance company. */
-const LOW_BALANCE_TOKENS = 5;
-const UPCOMING_LIMIT = 5;
-
-type TicketStatus = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
 
 type CustomerSettingsResponse = {
-  user: {
-    id: string;
-    email: string;
-    name: string | null;
-    companyRole: CompanyRole | null;
-  };
-  company: {
-    id: string;
-    name: string;
-    slug: string;
-    counts: { members: number; projects: number; tickets: number };
-  };
-  plan: {
-    id: string;
-    name: string;
-    monthlyTokens: number;
-    priceCents: number | null;
-    isActive: boolean;
-  } | null;
+  user: { id: string; email: string; name: string | null; companyRole: CompanyRole | null };
 };
 
-type CustomerTokensResponse = {
-  company: { tokenBalance: number };
-  stats: { totalCredits: number; totalDebits: number };
-};
-
-type CustomerBoardTicket = {
-  id: string;
-  title: string;
-  status: TicketStatus;
-  dueDate: string | null;
-  companyTicketNumber: number | null;
-  project: { id: string; name: string; code: string | null } | null;
-};
+type CustomerTokensResponse = { company: { tokenBalance: number } };
 
 type CustomerBoardResponse = {
-  stats: { byStatus: Record<TicketStatus, number>; total: number };
-  tickets: CustomerBoardTicket[];
+  stats: { byStatus: Record<HomeStatus, number>; total: number };
+  tickets: {
+    id: string;
+    title: string;
+    status: HomeStatus;
+    dueDate: string | null;
+    createdAt?: string | null;
+    updatedAt?: string | null;
+    companyTicketNumber: number | null;
+    project: { id: string; name: string; code: string | null } | null;
+    jobType?: { id: string; name: string } | null;
+  }[];
 };
 
-type DashboardData = {
+type DraftsResponse = {
+  drafts: { id: string; title?: string; updatedAt: string; attachments?: unknown[] }[];
+};
+type MoodboardsResponse = { moodboards: { id: string; title: string; updatedAt: string }[] };
+type TicketListResponse = { tickets?: { id: string; thumbnailUrl?: string | null }[] };
+
+type HomeData = {
   settings: CustomerSettingsResponse;
   tokens: CustomerTokensResponse;
   board: CustomerBoardResponse;
+  drafts: HomeDraft[];
+  moodboards: HomeMoodboard[];
+  /** Request id → picture, where the request has one. */
+  thumbnails: Record<string, string>;
 };
 
-type DashboardState =
+type HomeState =
   | { status: "loading" }
   | { status: "error"; message: string }
-  | { status: "ready"; data: DashboardData };
+  | { status: "ready"; data: HomeData; now: Date };
 
-const STATUS_ORDER: TicketStatus[] = ["TODO", "IN_PROGRESS", "IN_REVIEW", "DONE"];
-
-const STATUS_FILL: Record<TicketStatus, string> = {
-  TODO: "var(--av2-fill-neutral)",
-  IN_PROGRESS: "var(--av2-fill-lavender)",
-  IN_REVIEW: "var(--av2-fill-orange)",
-  DONE: "var(--av2-fill-green)",
-};
-
-function prettyCompanyRole(role: CompanyRole | null): string | null {
-  switch (role) {
-    case "OWNER":
-      return "Owner";
-    case "PM":
-      return "Project manager";
-    case "BILLING":
-      return "Billing manager";
-    case "MEMBER":
-      return "Member";
-    default:
-      return null;
-  }
-}
-
-function formatPrice(cents: number | null): string {
-  if (cents == null) return DASH;
-  const dollars = cents / 100;
-  const amount = Number.isInteger(dollars)
-    ? dollars.toLocaleString("en-US")
-    : dollars.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  return `$${amount}/mo`;
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
-function codeOf(ticket: CustomerBoardTicket): string {
-  return buildTicketCode({
-    projectCode: ticket.project?.code,
-    companyTicketNumber: ticket.companyTicketNumber,
-    ticketId: ticket.id,
-  });
-}
+type RecentFilter = "all" | "requests";
 
 async function readJson<T>(url: string, label: string): Promise<T> {
   const res = await fetch(url, { cache: "no-store" });
@@ -169,22 +121,51 @@ async function readJson<T>(url: string, label: string): Promise<T> {
   return json as T;
 }
 
-function StatTile({ icon, value, label }: { icon: ReactNode; value: ReactNode; label: string }) {
-  return (
-    <div className="flex min-w-0 items-center gap-3">
-      <IconTile tone="neutral" size={44}>
-        {icon}
-      </IconTile>
-      <div className="min-w-0">
-        <p className="text-xl leading-7 font-bold tabular-nums">{value}</p>
-        <p className="text-sm text-[var(--av2-text-2)]">{label}</p>
-      </div>
-    </div>
-  );
+/** Extras the page must load without: a failure just leaves that part out. */
+async function readOptional<T>(url: string): Promise<T | null> {
+  try {
+    const res = await fetch(url, { cache: "no-store" });
+    return res.ok ? ((await res.json()) as T) : null;
+  } catch {
+    return null;
+  }
 }
 
-export default function CustomerOverviewPage() {
-  const [state, setState] = useState<DashboardState>({ status: "loading" });
+const SHORTCUTS = [
+  {
+    href: "/customer/brand",
+    title: "Brand guide",
+    text: "Your brand, in one place",
+    icon: <IconBrandGuide width={24} height={24} />,
+    tone: "green" as const,
+  },
+  {
+    href: "/customer/moodboards",
+    title: "Moodboards",
+    text: "Collect your next direction",
+    icon: <IconMoodboards width={24} height={24} />,
+    tone: "lavender" as const,
+  },
+  {
+    href: "/customer/ai-tools",
+    title: "AI Tools",
+    text: "Write, edit and create",
+    icon: <IconAiTools width={24} height={24} />,
+    tone: "lavender" as const,
+  },
+  {
+    href: "/colors",
+    title: "Color Studio",
+    text: "Explore palettes",
+    icon: <IconColorStudio width={24} height={24} />,
+    tone: "green" as const,
+  },
+];
+
+export default function CustomerHomePage() {
+  const [state, setState] = useState<HomeState>({ status: "loading" });
+  const [recentFilter, setRecentFilter] = useState<RecentFilter>("all");
+  const [recapOpen, setRecapOpen] = useState(false);
 
   const [liveTick, setLiveTick] = useState(0);
   const liveRef = useRef(false);
@@ -193,19 +174,46 @@ export default function CustomerOverviewPage() {
     let cancelled = false;
     (async () => {
       try {
-        const [settings, tokens, board] = await Promise.all([
+        const [settings, tokens, board, drafts, moodboards, list] = await Promise.all([
           readJson<CustomerSettingsResponse>("/api/customer/settings", "Settings"),
           readJson<CustomerTokensResponse>("/api/customer/tokens", "Tokens"),
           readJson<CustomerBoardResponse>("/api/customer/board", "Board"),
+          readOptional<DraftsResponse>("/api/customer/ticket-drafts"),
+          readOptional<MoodboardsResponse>("/api/moodboards"),
+          readOptional<TicketListResponse>("/api/customer/tickets?limit=100"),
         ]);
-        if (!cancelled) setState({ status: "ready", data: { settings, tokens, board } });
+        if (cancelled) return;
+        const thumbnails: Record<string, string> = {};
+        for (const t of list?.tickets ?? []) if (t.thumbnailUrl) thumbnails[t.id] = t.thumbnailUrl;
+        setState({
+          status: "ready",
+          // Read in the browser with the data: the server can't know the customer's time of day.
+          now: new Date(),
+          data: {
+            settings,
+            tokens,
+            board,
+            thumbnails,
+            drafts: (drafts?.drafts ?? []).map((d) => ({
+              id: d.id,
+              title: d.title ?? "",
+              updatedAt: d.updatedAt,
+              fileCount: d.attachments?.length ?? 0,
+            })),
+            moodboards: (moodboards?.moodboards ?? []).map((m) => ({
+              id: m.id,
+              title: m.title,
+              updatedAt: m.updatedAt,
+            })),
+          },
+        });
       } catch (err) {
         if (liveRef.current) return; // background refresh: keep what's on screen
-        console.error("[CustomerOverview] load error", err);
+        console.error("[CustomerHome] load error", err);
         if (!cancelled) {
           setState({
             status: "error",
-            message: err instanceof Error ? err.message : "Failed to load your overview.",
+            message: err instanceof Error ? err.message : "Failed to load your home page.",
           });
         }
       }
@@ -222,371 +230,227 @@ export default function CustomerOverviewPage() {
   });
 
   const data = state.status === "ready" ? state.data : null;
-  const tickets = useMemo(() => data?.board.tickets ?? [], [data]);
-
-  const upcoming = useMemo(
-    () =>
-      tickets
-        .filter((t) => t.dueDate != null && t.status !== "DONE")
-        .sort((a, b) => new Date(a.dueDate!).getTime() - new Date(b.dueDate!).getTime())
-        .slice(0, UPCOMING_LIMIT),
-    [tickets],
-  );
-  const toReview = useMemo(() => tickets.filter((t) => t.status === "IN_REVIEW"), [tickets]);
-
-  const company = data?.settings.company ?? null;
-  const plan = data?.settings.plan ?? null;
+  const now = state.status === "ready" ? state.now : null;
   const companyRole = normalizeCompanyRole(data?.settings.user.companyRole ?? null);
-  const roleLabel = prettyCompanyRole(companyRole);
-  const stats = data?.board.stats ?? null;
-  const total = stats?.total ?? 0;
-  const done = stats?.byStatus.DONE ?? 0;
-  const open = total - done;
-  const completion = total > 0 ? Math.round((done / total) * 100) : 0;
+  const canCreate = canCreateTickets(companyRole);
   const balance = data?.tokens.company.tokenBalance ?? null;
+  const lowBalance = balance != null && balance < LOW_BALANCE_TOKENS;
+  const stats = data?.board.stats ?? null;
+  const open = (stats?.total ?? 0) - (stats?.byStatus.DONE ?? 0);
+  const firstName = data?.settings.user.name?.trim().split(/\s+/)[0] ?? null;
+
+  const tickets = useMemo<HomeTicket[]>(
+    () =>
+      (data?.board.tickets ?? []).map((t) => ({
+        id: t.id,
+        title: t.title,
+        status: t.status,
+        dueDate: t.dueDate,
+        createdAt: t.createdAt ?? null,
+        updatedAt: t.updatedAt ?? null,
+        service: t.jobType?.name ?? null,
+        code: buildTicketCode({
+          projectCode: t.project?.code,
+          companyTicketNumber: t.companyTicketNumber,
+          ticketId: t.id,
+        }),
+      })),
+    [data],
+  );
+
+  const reminders = useMemo(
+    () =>
+      data && now
+        ? customerReminders({
+            tickets,
+            drafts: data.drafts,
+            balance,
+            canReview: canEditTickets(companyRole),
+            canCreate,
+            now,
+          })
+        : [],
+    [data, now, tickets, balance, companyRole, canCreate],
+  );
+  const attention: AttentionItem[] = reminders.slice(0, REMINDER_LIMIT).map((r) => ({
+    key: r.key,
+    title: r.title,
+    detail: r.detail,
+    badge: r.badge,
+    action: r.action,
+    thumbnailUrl: r.ticketId ? data?.thumbnails[r.ticketId] : null,
+    tone: r.kind === "lowTokens" ? "amber" : r.kind === "draft" ? "neutral" : "peach",
+    icon:
+      r.kind === "lowTokens" ? <IconCoins /> : r.kind === "draft" ? <IconDocument /> : undefined,
+  }));
+
+  const recent = useMemo<RecentCard[]>(() => {
+    if (!data || !now) return [];
+    return recentWork({
+      role: "customer",
+      tickets,
+      drafts: recentFilter === "all" && canCreate ? data.drafts : [],
+      moodboards: recentFilter === "all" ? data.moodboards : [],
+      now,
+    }).map((item) => ({
+      key: item.key,
+      title: item.title,
+      href: item.href,
+      badge: item.badge,
+      detail: item.detail,
+      thumbnailUrl: item.ticketId ? data.thumbnails[item.ticketId] : null,
+      tone: item.kind === "moodboard" ? "lavender" : item.kind === "draft" ? "neutral" : "peach",
+      icon:
+        item.kind === "moodboard" ? (
+          <IconMoodboards width={24} height={24} />
+        ) : item.kind === "draft" ? (
+          <IconDocument />
+        ) : undefined,
+    }));
+  }, [data, now, tickets, recentFilter, canCreate]);
+
+  const suggestion = useMemo(
+    () => (data && now ? customerSuggestion({ tickets, canCreate, now }) : null),
+    [data, now, tickets, canCreate],
+  );
+
+  const slot = useHeroSlot();
+  const greeting = slot ? HERO_GREETING[slot] : "Welcome";
 
   return (
     <>
-      <PageHeader
-        title="Overview"
-        description="Your creative workspace at a glance."
-        meta={
-          company ? (
+      <HomeHero
+        slot={slot}
+        loading={state.status === "loading"}
+        date={
+          now
+            ? now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
+            : null
+        }
+        title={firstName ? `${greeting}, ${firstName}.` : `${greeting}.`}
+        tagline="Your next great idea starts here."
+        stats={
+          data ? (
             <>
-              Company <span className="font-medium text-[var(--av2-text)]">{company.name}</span>
-              {roleLabel ? (
-                <>
-                  {" · "}You are browsing as{" "}
-                  <span className="font-medium text-[var(--av2-text)]">{roleLabel}</span>
-                </>
-              ) : null}
+              <HeroStat icon={<IconTicket />} tone="green" href="/customer/board">
+                {fmt(open)} open {plural(open, "request", "requests")}
+              </HeroStat>
+              <HeroStat icon={<IconCoins />} tone={lowBalance ? "amber" : "peach"}>
+                {fmt(balance)} {plural(balance ?? 0, "token", "tokens")} left
+                {lowBalance ? " · Low balance" : ""}
+              </HeroStat>
+              <ArrowLink href="/customer/tokens">Balance</ArrowLink>
             </>
           ) : null
         }
         actions={
-          canCreateTickets(companyRole) ? (
-            <ButtonLink href="/customer/tickets/new" variant="primary">
-              + New request
-            </ButtonLink>
+          data ? (
+            <>
+              {canCreate ? (
+                <ButtonLink href="/customer/tickets/new" variant="primary">
+                  <IconPlus />
+                  New request
+                </ButtonLink>
+              ) : null}
+              {canBookConsultation(companyRole) ? (
+                <ButtonLink href="/customer/consultation">
+                  <IconConsultation width={18} height={18} />
+                  Book a consultation
+                </ButtonLink>
+              ) : null}
+            </>
           ) : null
         }
       />
 
       {state.status === "error" ? (
-        <Callout tone="error" title="We couldn't load your overview">
+        <Callout tone="error" title="We couldn't load your home page">
           {state.message}
         </Callout>
       ) : state.status === "loading" ? (
-        <div aria-busy="true" aria-label="Loading your overview" className="space-y-6">
-          <div className="grid gap-6 md:grid-cols-3">
-            <Skeleton className="h-36" />
-            <Skeleton className="h-36" />
-            <Skeleton className="h-36" />
-          </div>
-          <Skeleton className="h-32" />
+        <div aria-busy="true" aria-label="Loading your home page" className="space-y-6">
+          <Skeleton className="h-20" />
           <Skeleton className="h-64" />
+          <Skeleton className="h-56" />
         </div>
       ) : (
         <div className="space-y-6">
-          <div className="grid gap-6 md:grid-cols-3">
-            <KpiCard
-              icon={<IconCoins />}
-              tone="green"
-              label="Token balance"
-              value={
-                <>
-                  {fmt(balance)}{" "}
-                  <span className="text-xl font-semibold">
-                    {plural(balance ?? 0, "token", "tokens")}
-                  </span>
-                </>
-              }
-              action={
-                <TextLink href="/customer/tokens" arrow={false}>
-                  View ledger
-                </TextLink>
-              }
-              hint={
-                balance != null && balance < LOW_BALANCE_TOKENS ? (
-                  <Badge tone="amber" icon={<IconAlertCircle width={14} height={14} />}>
-                    Low balance
-                  </Badge>
-                ) : undefined
-              }
-            />
-            <KpiCard
-              icon={<IconTicket />}
-              tone="lavender"
-              label="Open requests"
-              value={
-                <>
-                  {fmt(open)}{" "}
-                  <span className="text-xl font-medium text-[var(--av2-text-2)]">
-                    of {fmt(total)} total
-                  </span>
-                </>
-              }
-              action={
-                <TextLink href="/customer/board" arrow={false}>
-                  Open board
-                </TextLink>
-              }
-            />
-            <KpiCard
-              icon={<IconClock />}
-              tone="green"
-              label="Completed"
-              value={
-                <>
-                  {fmt(done)}{" "}
-                  <span className="text-xl font-medium text-[var(--av2-text-2)]">
-                    of {fmt(total)} total
-                  </span>
-                </>
-              }
-              hint={
-                total > 0 ? (
-                  <>
-                    <span className="text-sm text-[var(--av2-text)]">{completion}% completion</span>
-                    <span
-                      role="progressbar"
-                      aria-label="Completion rate"
-                      aria-valuenow={completion}
-                      aria-valuemin={0}
-                      aria-valuemax={100}
-                      className="mt-2 block h-2 w-full overflow-hidden rounded-full bg-[var(--av2-track)]"
-                    >
-                      <span
-                        className="block h-full rounded-full bg-[var(--av2-fill-green)]"
-                        style={{ width: `${completion}%` }}
-                      />
-                    </span>
-                  </>
-                ) : undefined
-              }
-            />
-          </div>
+          <ShortcutCards items={SHORTCUTS} />
 
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
-            <Card className="flex items-center">
-              <div className="flex w-full flex-wrap items-center gap-x-8 gap-y-4">
-                <div className="flex min-w-[220px] flex-1 items-center gap-4">
-                  <IconTile tone="peach">
-                    <IconDocument />
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,8fr)_minmax(0,5fr)] [&>*:only-child]:lg:col-span-2">
+            <AttentionList
+              title="Needs your attention"
+              items={attention}
+              total={reminders.length}
+              empty={
+                <div className="flex flex-col items-center px-4 pt-6 pb-2 text-center">
+                  <IconTile tone="green" size={48} round>
+                    <IconCheck />
                   </IconTile>
-                  <div className="min-w-0">
-                    <h2 className="text-xl leading-7 font-semibold">Token activity</h2>
-                    <p className="text-sm text-[var(--av2-text-2)]">All-time totals</p>
-                  </div>
+                  <p className="mt-3 text-base font-semibold">You’re all caught up</p>
+                  <p className="mt-1 max-w-sm text-sm text-[var(--av2-text-2)]">
+                    Work to review, unfinished drafts and due dates show up here.
+                  </p>
                 </div>
-                <dl className="flex flex-wrap gap-x-8 gap-y-3">
-                  <div className="min-w-0 border-l border-[var(--av2-border)] pl-6">
-                    <dt className="text-sm text-[var(--av2-text-2)]">Credits</dt>
-                    <dd className="text-xl leading-7 font-bold tabular-nums">
-                      {fmt(data?.tokens.stats.totalCredits)}
-                    </dd>
-                  </div>
-                  <div className="min-w-0 border-l border-[var(--av2-border)] pl-6">
-                    <dt className="text-sm text-[var(--av2-text-2)]">Debits</dt>
-                    <dd className="text-xl leading-7 font-bold tabular-nums">
-                      {fmt(data?.tokens.stats.totalDebits)}
-                    </dd>
-                  </div>
-                </dl>
-              </div>
-            </Card>
-
-            <Card>
-              <h2 className="text-xl leading-7 font-semibold">Workflow</h2>
-              {total > 0 ? (
-                <div
-                  aria-hidden
-                  className="mt-3 flex h-3 w-full gap-0.5 overflow-hidden rounded-full"
-                >
-                  {STATUS_ORDER.map((status) =>
-                    (stats?.byStatus[status] ?? 0) > 0 ? (
-                      <span
-                        key={status}
-                        style={{
-                          flexGrow: stats?.byStatus[status] ?? 0,
-                          background: STATUS_FILL[status],
-                        }}
-                      />
-                    ) : null,
-                  )}
-                </div>
-              ) : null}
-              <dl className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {STATUS_ORDER.map((status) => (
-                  <div key={status} className="min-w-0">
-                    <dt>
-                      <StatusDot
-                        tone={TICKET_STATUS[status].tone}
-                        label={TICKET_STATUS[status].label}
-                      />
-                    </dt>
-                    <dd className="mt-1 text-xl leading-7 font-bold tabular-nums">
-                      {fmt(stats?.byStatus[status] ?? 0)}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            </Card>
+              }
+              footer={
+                reminders.length > attention.length ? (
+                  <p className="mt-3 text-sm text-[var(--av2-text-2)]">
+                    And {reminders.length - attention.length} more.{" "}
+                    <TextLink href="/customer/board" arrow={false}>
+                      Open board
+                    </TextLink>
+                  </p>
+                ) : null
+              }
+            />
+            <BrandReadyCard />
           </div>
 
-          {toReview.length > 0 && canEditTickets(companyRole) ? (
-            <section className="flex flex-wrap items-center gap-4 rounded-2xl border border-[var(--av2-attention-border)] bg-gradient-to-r from-[var(--av2-attention-from)] to-[var(--av2-attention-to)] p-6">
-              <IconTile tone="peach" round>
-                <IconClock />
-              </IconTile>
-              <div className="min-w-[240px] flex-1">
-                <h2 className="text-xl leading-7 font-semibold">
-                  {toReview.length === 1
-                    ? "Needs your review"
-                    : `${toReview.length} requests need your review`}
-                </h2>
-                <p className="mt-0.5 text-base">
-                  <span className="text-[var(--av2-text-2)]">{codeOf(toReview[0])}</span>{" "}
-                  {toReview[0].title}
-                </p>
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,8fr)_minmax(0,4fr)] [&>*:only-child]:lg:col-span-2">
+            <section className="min-w-0 rounded-2xl border border-[var(--av2-border)] bg-[var(--av2-surface)] p-6">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-[22px] leading-7 font-semibold">Recent work</h2>
+                <FilterChips<RecentFilter>
+                  label="Filter recent work"
+                  options={[
+                    { value: "all", label: "All" },
+                    { value: "requests", label: "Requests" },
+                  ]}
+                  value={recentFilter}
+                  onChange={setRecentFilter}
+                />
               </div>
-              <ButtonLink href={`/customer/tickets/${toReview[0].id}`} variant="primary">
-                Review request
-                <IconArrowUpRight />
-              </ButtonLink>
+              {recent.length === 0 ? (
+                <p className="py-6 text-center text-sm text-[var(--av2-text-2)]">
+                  {recentFilter === "requests"
+                    ? "No open requests yet."
+                    : "Requests, drafts and moodboards you work on show up here."}
+                </p>
+              ) : (
+                <RecentCards items={recent} />
+              )}
+            </section>
+            <RecapMiniCard open={recapOpen} onToggle={() => setRecapOpen((v) => !v)} />
+          </div>
+
+          {recapOpen ? <MonthlyRecapCard /> : null}
+
+          {suggestion ? (
+            <section
+              aria-label="Suggested for you"
+              className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-2xl border border-[#e2dbf7] bg-[var(--av2-lavender-bg)] px-6 py-4 dark:border-[#352d57]"
+            >
+              <p className="text-lg font-semibold">{suggestion.title}</p>
+              <p className="min-w-[200px] flex-1 text-[15px]">{suggestion.reason}</p>
+              <TextLink href={suggestion.action.href} arrow={false}>
+                <span className="inline-flex items-center gap-1.5 font-semibold">
+                  {suggestion.action.label}
+                  <IconArrowRight width={16} height={16} />
+                </span>
+              </TextLink>
             </section>
           ) : null}
-
-          {/* Engagement cards; each renders nothing while its owner switch is off. */}
-          <div className="grid gap-6 empty:hidden lg:grid-cols-2 [&>*:only-child]:lg:col-span-2">
-            <MonthlyRecapCard />
-            <BrandProfileCard />
-          </div>
-
-          <IntegrationsPrompt />
-
-          <Card padding="none">
-            <div className="px-6 pt-6 pb-4">
-              <CardTitle>Upcoming requests</CardTitle>
-            </div>
-            {upcoming.length === 0 ? (
-              <EmptyState
-                title="No upcoming due dates"
-                description="Open requests with a due date will appear here."
-              />
-            ) : (
-              <Table label="Upcoming requests">
-                <thead>
-                  <tr>
-                    <Th className="max-sm:hidden">ID</Th>
-                    <Th>Request</Th>
-                    <Th>Status</Th>
-                    <Th>Due date</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {upcoming.map((ticket) => {
-                    const status = TICKET_STATUS[ticket.status];
-                    const overdue = isDueDateOverdue(ticket.dueDate);
-                    return (
-                      <tr
-                        key={ticket.id}
-                        className="border-b border-[var(--av2-border)] last:border-b-0"
-                      >
-                        <Td className="whitespace-nowrap text-[var(--av2-text-2)] max-sm:hidden">
-                          {codeOf(ticket)}
-                        </Td>
-                        <Td>
-                          <Link
-                            href={`/customer/tickets/${ticket.id}`}
-                            className="font-medium hover:underline"
-                          >
-                            {ticket.title}
-                          </Link>
-                        </Td>
-                        <Td>
-                          <Badge tone={status.tone as Tone} dot>
-                            {status.label}
-                          </Badge>
-                        </Td>
-                        <Td className="whitespace-nowrap">
-                          <span
-                            className={overdue ? "font-medium text-[var(--av2-error-text)]" : ""}
-                          >
-                            {formatDate(ticket.dueDate!)}
-                            {overdue ? " · Overdue" : ""}
-                          </span>
-                        </Td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </Table>
-            )}
-          </Card>
-
-          <div className="grid gap-6 lg:grid-cols-2">
-            <Card>
-              <CardTitle description={company?.name}>Company</CardTitle>
-              {company ? (
-                <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
-                  <StatTile
-                    icon={<IconUsers />}
-                    value={fmt(company.counts.members)}
-                    label={plural(company.counts.members, "member", "members")}
-                  />
-                  <StatTile
-                    icon={<IconMoodboards width={20} height={20} />}
-                    value={fmt(company.counts.projects)}
-                    label={plural(company.counts.projects, "project", "projects")}
-                  />
-                  <StatTile
-                    icon={<IconTicket />}
-                    value={fmt(company.counts.tickets)}
-                    label={plural(company.counts.tickets, "request", "requests")}
-                  />
-                </div>
-              ) : null}
-            </Card>
-
-            <Card>
-              <CardTitle
-                description={plan?.name}
-                action={
-                  canManagePlan(companyRole) ? (
-                    <TextLink href="/customer/settings" arrow={false}>
-                      Manage plan
-                    </TextLink>
-                  ) : undefined
-                }
-              >
-                Plan
-              </CardTitle>
-              {plan ? (
-                <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <StatTile
-                    icon={<IconCoins />}
-                    value={fmt(plan.monthlyTokens)}
-                    label="monthly tokens"
-                  />
-                  <StatTile
-                    icon={<IconCatalog width={20} height={20} />}
-                    value={formatPrice(plan.priceCents)}
-                    label="price"
-                  />
-                </div>
-              ) : (
-                <p className="mt-3 text-sm text-[var(--av2-text-2)]">
-                  No plan is assigned yet. Please contact support.
-                </p>
-              )}
-              {!canManagePlan(companyRole) ? (
-                <p className="mt-4 text-sm text-[var(--av2-text-2)]">
-                  Only the owner or billing manager can change billing details.
-                </p>
-              ) : null}
-            </Card>
-          </div>
         </div>
       )}
     </>

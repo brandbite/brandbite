@@ -77,6 +77,10 @@ const securityHeaders = [
       // - media.brandbite.studio + r2 endpoint: inline PDF deliverable preview
       //   in the revision lightbox (public URL or presigned GET fallback)
       "frame-src https://js.stripe.com https://challenges.cloudflare.com https://www.youtube.com https://player.vimeo.com https://www.loom.com https://open.spotify.com https://media.brandbite.studio https://*.r2.cloudflarestorage.com",
+      // - blob: Mockup Studio plays a screen recording the visitor picked from
+      //   their own device. Without it the video is CSP-blocked ("Media load
+      //   rejected by URL safety check") and the studio can't read the file.
+      "media-src 'self' blob:",
       "worker-src 'self' blob:",
       "object-src 'none'",
       "base-uri 'self'",
