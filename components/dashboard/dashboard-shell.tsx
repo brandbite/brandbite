@@ -210,6 +210,33 @@ export function DashboardShell({ role, children }: { role: DashboardRole; childr
         </nav>
 
         <div className="shrink-0 border-t border-[var(--av2-border)] px-3 py-3">
+          {nav.footerItems?.length ? (
+            <ul className="mb-1 flex flex-col gap-0.5">
+              {nav.footerItems.map((item) => {
+                const active = isDashboardLeafActive(item, pathname, role);
+                const Icon = item.icon;
+                return (
+                  <li key={item.href}>
+                    <Link
+                      href={item.href}
+                      aria-current={active ? "page" : undefined}
+                      title={collapsed ? item.label : undefined}
+                      className={itemClass(active, collapsed)}
+                    >
+                      <Icon
+                        width={20}
+                        height={20}
+                        className={`shrink-0 ${active ? "" : "text-[var(--av2-text-2)]"}`}
+                      />
+                      <span className={`truncate ${collapsed ? "md:sr-only" : ""}`}>
+                        {item.label}
+                      </span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : null}
           <UserMenu
             user={user}
             placement="up"

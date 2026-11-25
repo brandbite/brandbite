@@ -48,17 +48,21 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
             items: [
               {
                 term: "Workspace",
-                text: "your day-to-day work: **Overview**, the **Board** with the requests assigned to you, your **Portfolio** of completed requests, and **Color Studio**. Color Studio opens our public color tools; use **Go to dashboard** at the top of the page to come back.",
+                text: "your day-to-day work: **Home**, the **Board** with the requests assigned to you, **Moodboards**, and your **Portfolio** of completed requests.",
+              },
+              {
+                term: "Tools",
+                text: "**All tools** lists every tool you can use. **Color Studio** is here too; it opens our public color tools, and **Go to dashboard** at the top of the page brings you back.",
               },
               {
                 term: "Earnings",
-                text: "your **Balance** of earned tokens, and **Withdrawals** for requesting payouts.",
-              },
-              {
-                term: "Account",
-                text: "your **Profile**, **Settings**, the **FAQ** and this **Support** section.",
+                text: "your **Balance** of earned tokens, **Withdrawals** for requesting payouts, and **Stats** with your workload, payout rate and tier progress.",
               },
             ],
+          },
+          {
+            type: "p",
+            text: "**Settings** and **Support** are pinned to the bottom of the sidebar. Your **Profile** is in the account menu under them, and the **FAQ** is reached from **Support**. The search in the top bar finds them too.",
           },
           {
             type: "tip",
@@ -221,7 +225,7 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
           },
           {
             type: "p",
-            text: "Timed pauses end on their own. To come back early, click **Continue working** in Settings or on the banner at the top of Overview and the Board.",
+            text: "Timed pauses end on their own. To come back early, click **Continue working** in Settings or on the banner at the top of Home and the Board.",
           },
         ],
       },
@@ -233,12 +237,96 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
   // ---------------------------------------------------------------------------
   {
     slug: "overview",
-    title: "Overview",
-    summary: "Your balance, active requests, earnings, payout rate and deadlines at a glance.",
+    title: "Home",
+    summary:
+      "Where you land after signing in: what to do next, your payout tier progress and your recent work.",
     category: "Work",
     routes: ["/creative"],
-    keywords: ["dashboard", "home", "summary", "deadlines", "load score"],
-    related: ["board", "earnings"],
+    keywords: ["dashboard", "overview", "summary", "deadlines", "next moves", "payout tier"],
+    related: ["board", "earnings", "stats"],
+    sections: [
+      {
+        heading: "What's on the page",
+        blocks: [
+          {
+            type: "list",
+            items: [
+              {
+                term: "The banner",
+                text: "a greeting for the time of day with three shortcuts: your active requests (opens the **Board**), your token balance (opens **Balance**) and your payout rate (opens **Stats**).",
+              },
+              {
+                term: "Open board and Upload a delivery",
+                text: "**Open board** goes to the Board. **Upload a delivery** opens the request at the top of your next moves that you are working on; it only shows when there is one.",
+              },
+              {
+                term: "The four cards under the banner",
+                text: "shortcuts to **Moodboards**, **Color Studio**, your **Portfolio** and **All tools**.",
+              },
+              {
+                term: "Your next moves",
+                text: "your open requests in the order to act on them. See below.",
+              },
+              {
+                term: "Your next payout tier",
+                text: "how many approved requests you have toward the next tier, how many are left, and the rate you move to. **View tiers** opens Settings.",
+              },
+              {
+                term: "Latest withdrawal",
+                text: "your most recent payout request and its status. **View withdrawals** opens Withdrawals.",
+              },
+              {
+                term: "Pick up where you left off",
+                text: "the three things you touched last: open requests and moodboards.",
+              },
+            ],
+          },
+          {
+            type: "tip",
+            text: "If you haven't picked any skills yet, the page starts with a **Welcome to brandbite!** checklist. Select your skills first so requests can be assigned to you.",
+          },
+        ],
+      },
+      {
+        heading: "Your next moves",
+        blocks: [
+          {
+            type: "p",
+            text: "Up to five requests show, each with its code, how long until it is due, and a button that opens it. The number next to the title counts all your open requests.",
+          },
+          {
+            type: "list",
+            items: [
+              {
+                term: "Revision requested",
+                text: "the customer asked for changes on your latest delivery. These come first.",
+              },
+              {
+                term: "In progress",
+                text: "requests you are working on, soonest due date first.",
+              },
+              {
+                term: "New assignment",
+                text: "requests in Backlog that you haven't started. **View brief** opens the request.",
+              },
+              {
+                term: "With the customer",
+                text: "requests In review, waiting for the customer's answer.",
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    slug: "stats",
+    title: "Stats",
+    summary: "Your balance, workload, payout rate and tier progress in numbers.",
+    category: "Earnings",
+    routes: ["/creative/stats"],
+    keywords: ["numbers", "load score", "workflow", "priority", "payout rate", "streak"],
+    related: ["overview", "earnings"],
     sections: [
       {
         heading: "What's on the page",
@@ -267,10 +355,6 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
                 text: "all your requests by status and by priority.",
               },
               {
-                term: "Your next requests",
-                text: "up to five unfinished requests with due dates, soonest first. Filter by status, or click a title to open it.",
-              },
-              {
                 term: "Load score",
                 text: "how heavy your open requests are, weighted by priority and token cost.",
               },
@@ -284,10 +368,6 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
             type: "p",
             feature: "creativeProgress",
             text: "**First-pass streak** counts how many of your latest completed requests in a row were approved without the customer asking for changes. It starts again when a request needs a revision. The **Current payout rate** card also shows how many requests are left to the next tier.",
-          },
-          {
-            type: "tip",
-            text: "If you haven't picked any skills yet, the page starts with a **Welcome to brandbite!** checklist. Select your skills first so requests can be assigned to you.",
           },
         ],
       },
@@ -542,6 +622,15 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
           },
         ],
       },
+      {
+        heading: "Showing a design on a device",
+        blocks: [
+          {
+            type: "p",
+            text: "To present your work on a device instead of as a flat image: Open the image and click **Show on a device** at the top. It opens in Mockup Studio on a phone, a tablet or a laptop, chosen by the image's shape; there you can turn the device, change the background and download a picture or a video. **Back to the request** returns you. It works for images, not for PDFs.",
+          },
+        ],
+      },
     ],
   },
   {
@@ -735,7 +824,7 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
           },
           {
             type: "p",
-            text: "See your rate and progress in **Settings → Payout tiers** and on the **Current payout rate** card on Overview.",
+            text: "See your rate and progress in **Settings → Payout tiers** on the **Your next payout tier** card on Home, and on **Stats**.",
           },
         ],
       },
@@ -864,6 +953,66 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
           {
             type: "warning",
             text: "**Cancel** appears on Pending requests only. It acts immediately, with no confirmation, and the request is removed from your history.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    slug: "tools",
+    title: "Tools",
+    summary: "Every tool you can use in brandbite on one page, and which ones are in your sidebar.",
+    category: "Work",
+    routes: ["/creative/tools"],
+    keywords: ["all tools", "hub", "apps", "soon", "coming soon", "search", "find a tool"],
+    related: ["moodboards"],
+    sections: [
+      {
+        heading: "Finding a tool",
+        blocks: [
+          {
+            type: "p",
+            text: "**All tools**, under **Tools** in the sidebar, lists every tool you can use, grouped by what it is for. Click a card to open the tool.",
+          },
+          {
+            type: "list",
+            items: [
+              {
+                term: "Find a tool",
+                text: "type part of a tool's name or what it does to narrow the list.",
+              },
+              {
+                term: "Category buttons",
+                text: "show one group at a time. **All** brings every group back.",
+              },
+            ],
+          },
+          {
+            type: "tip",
+            text: "**Color Studio** also sits in the sidebar under **All tools**.",
+          },
+        ],
+      },
+      {
+        heading: "What the labels mean",
+        blocks: [
+          {
+            type: "list",
+            items: [
+              {
+                term: "Soon",
+                text: "the tool is being built. Its card has a dashed outline and can't be opened yet.",
+              },
+            ],
+          },
+        ],
+      },
+      {
+        heading: "Tools that open outside the dashboard",
+        blocks: [
+          {
+            type: "p",
+            text: "**Color Studio**, **Gradient generator**, **Mockup Studio**, **Social resizer**, **Image converter**, **Post and ad preview**, **Type scale** and **Size guide** open on our public site, so the sidebar is not there. Use your browser's back button to return to the dashboard.",
           },
         ],
       },

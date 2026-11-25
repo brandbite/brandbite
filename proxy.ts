@@ -107,6 +107,20 @@ const PUBLIC_PATHS = [
   "/templates",
   // Free creative brief generator (client-side tool, no API).
   "/brief-generator",
+  // Mockup Studio (client-side 3D tool) and the check that tells it whether
+  // the visitor is signed in and on a plan. The check answers "signed out"
+  // itself; listing it here keeps a visitor from being sent to /login.
+  "/mockups",
+  // Free image and QR tools (client-side, no API of their own).
+  "/social-resizer",
+  "/image-converter",
+  "/qr-code",
+  "/type-scale",
+  "/logo-pack",
+  "/email-signature",
+  "/post-preview",
+  "/api/tools/entitlement",
+  "/api/tools/signature-logo",
   // Free brand kit generator and font pairing pages.
   "/brand-kit",
   // Free design cost calculator (client-side, no API).

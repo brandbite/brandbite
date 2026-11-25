@@ -48,17 +48,21 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
             items: [
               {
                 term: "Workspace",
-                text: "your day-to-day work: **Overview**, the **Board** with all your requests, **Moodboards**, **AI Tools** and **Color Studio**. Color Studio opens our public color tools; use **Go to dashboard** at the top of the page to come back.",
+                text: "your day-to-day work: **Home**, the **Board** with all your requests, your **Brand guide** and **Moodboards**.",
+              },
+              {
+                term: "Tools",
+                text: "**All tools** lists every tool you can use. **AI Tools**, **Color Studio** and **Mockup Studio** are here too. Color Studio opens our public color tools; use **Go to dashboard** at the top of the page to come back.",
               },
               {
                 term: "Billing",
                 text: "the **Services** you can request, your **Tokens** balance and history, and **Consultation** bookings.",
               },
-              {
-                term: "Account",
-                text: "your **Profile**, your company's **Members**, **Settings**, the **FAQ** and this **Support** section.",
-              },
             ],
+          },
+          {
+            type: "p",
+            text: "**Settings** and **Support** are pinned to the bottom of the sidebar. Your **Profile** is in the account menu under them. **Members** is reached from **Settings**, and the **FAQ** from **Support**. The search in the top bar finds all of them too.",
           },
           {
             type: "tip",
@@ -212,7 +216,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
           },
           {
             type: "tip",
-            text: 'Your own role is shown on the **Overview** page ("You are browsing as …") and in **Settings → Workspace access** under **Company role**.',
+            text: "Your own role is shown in **Settings → Workspace access** under **Company role**.",
           },
         ],
       },
@@ -270,12 +274,13 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
   // ---------------------------------------------------------------------------
   {
     slug: "overview",
-    title: "Overview",
-    summary: "Your balance, open work, upcoming deadlines and plan at a glance.",
+    title: "Home",
+    summary:
+      "Where you land after signing in: what needs your attention, your brand setup and your recent work.",
     category: "Workspace",
     routes: ["/customer"],
-    keywords: ["dashboard", "home", "summary", "deadlines", "due"],
-    related: ["board", "tokens"],
+    keywords: ["dashboard", "overview", "summary", "deadlines", "due", "reminders", "attention"],
+    related: ["board", "tokens", "tools"],
     sections: [
       {
         heading: "What's on the page",
@@ -284,52 +289,83 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
             type: "list",
             items: [
               {
-                term: "Token balance",
-                text: "tokens available right now. **View ledger** opens the Tokens page.",
+                term: "The banner",
+                text: "a greeting for the time of day, how many requests aren't Done yet (opens the **Board**) and your token balance. **Balance** opens **Tokens**.",
               },
               {
-                term: "Open requests",
-                text: "how many requests aren't Done yet. **Open board** takes you to the Board.",
+                term: "New request and Book a consultation",
+                text: "**New request** shows to Owners, Project managers and Members. **Book a consultation** shows to Owners and Project managers, who are the ones who can book.",
               },
               {
-                term: "Completed",
-                text: "requests marked Done and your completion rate.",
+                term: "The four cards under the banner",
+                text: "shortcuts to your **Brand guide**, **Moodboards**, **AI Tools** and **Color Studio**.",
               },
               {
-                term: "Token activity and Workflow",
-                text: "your credits and debits, and how many requests are in each status.",
+                term: "Needs your attention",
+                text: "the things waiting for you, most pressing first. See below.",
               },
               {
-                term: "Needs your review",
-                text: "appears when work is In review. **Review request** opens the first one.",
+                term: "Recent work",
+                text: "the three things you touched last: open requests, drafts and moodboards. **Requests** shows only requests; **All** brings the rest back.",
+              },
+            ],
+          },
+        ],
+      },
+      {
+        heading: "Needs your attention",
+        blocks: [
+          {
+            type: "p",
+            text: "Each line has a button that takes you straight to the thing. The list is worked out from your requests, drafts and balance, so a line disappears by itself once you have dealt with it. The number next to the title counts everything that is waiting.",
+          },
+          {
+            type: "list",
+            items: [
+              {
+                term: "Ready for review",
+                text: "a request is In review and waiting for your approval. Shown to Owners, Project managers and Members.",
               },
               {
-                term: "Keep your source files in your own storage",
-                text: "appears until your company connects Google Drive or Dropbox, so source files land in your own storage instead of being deleted from brandbite 90 days after a request is done. Owners and Project managers can connect from it; **Not now** hides it for 30 days. If a connection breaks, it asks you to reconnect.",
+                term: "Past due date",
+                text: "an open request whose due date has passed.",
               },
               {
-                term: "Upcoming requests",
-                text: "the five most urgent open requests that have a due date. Overdue ones are red. Click a title to open it.",
+                term: "Draft",
+                text: "a request you started and saved without sending. **Continue** opens it where you left off.",
               },
               {
-                term: "Company and Plan",
-                text: "your member, project and request counts, and your plan's monthly tokens and price. If you can change the plan, **Manage plan** goes to Settings.",
+                term: "Due soon",
+                text: "an open request that is due within three days.",
+              },
+              {
+                term: "Tokens are running low",
+                text: "your company has fewer than 5 tokens left.",
               },
             ],
           },
           {
             type: "p",
-            text: "Owners, Project managers and Members also see a **+ New request** button at the top.",
+            text: "Up to five lines show at once. When nothing is waiting, the card says **You're all caught up**.",
           },
         ],
       },
       {
-        heading: "Brand profile",
+        heading: "Connect your file storage",
+        blocks: [
+          {
+            type: "p",
+            text: "Until your company connects Google Drive or Dropbox, the card on the right offers to connect one, so source files land in your own storage instead of being deleted from brandbite 90 days after a request is done. Owners and Project managers can connect from it; others are told who can. If a connection breaks, it asks you to reconnect.",
+          },
+        ],
+      },
+      {
+        heading: "Your brand, ready to create",
         feature: "brandProfile",
         blocks: [
           {
             type: "p",
-            text: "The **Brand profile** card shows how complete your brand setup is, as a percentage, with a short checklist.",
+            text: "The card on the right shows how complete your brand setup is, as a percentage and a bar with one segment per step. Under it is the next step that isn't done, with a link that takes you to it.",
           },
           {
             type: "list",
@@ -363,17 +399,17 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
           },
           {
             type: "p",
-            text: "Only the next step that isn't done shows its button. When every step is done, the card says **All set**.",
+            text: "When every step is done, the card says **All set**.",
           },
         ],
       },
       {
-        heading: "Monthly recap",
+        heading: "Last month",
         feature: "monthlyRecap",
         blocks: [
           {
             type: "p",
-            text: "The **Monthly recap** card sums up last month: requests delivered, tokens used and an estimated agency equivalent. It stays for the whole month, and it doesn't appear if nothing was delivered last month.",
+            text: "The **Last month** card sums up the month before this one: requests delivered and tokens used. It stays for the whole month, and it doesn't appear if nothing was delivered. **View monthly recap** opens the full recap under it.",
           },
           {
             type: "list",
@@ -391,6 +427,15 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
           {
             type: "p",
             text: "Owners and Project managers also get the recap by email once a month.",
+          },
+        ],
+      },
+      {
+        heading: "The suggestion at the bottom",
+        blocks: [
+          {
+            type: "p",
+            text: "When you have asked for the same service in each of the last three months and not yet this month, a line at the bottom of the page offers to start this month's. **Start a request** opens a new request.",
           },
         ],
       },
@@ -519,7 +564,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
           {
             type: "steps",
             items: [
-              "Click **+ New request** on Overview or **My requests**, **New request** on the Board, or **Create request** on a service in **Services**.",
+              "Click **+ New request** on Home or **My requests**, **New request** on the Board, or **Create request** on a service in **Services**.",
               "Write a **Title**. This is the line your creative sees on the board.",
               "Describe what you need in the **Brief**: links, context and requirements.",
               "Pick a **Service** with **Choose a service…**. Search or browse by category, click a service, then press **Select**.",
@@ -713,6 +758,15 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
           {
             type: "tip",
             text: "Your creative marks each pin as resolved as they work through it, and you are notified.",
+          },
+        ],
+      },
+      {
+        heading: "Showing a design on a device",
+        blocks: [
+          {
+            type: "p",
+            text: "To see a delivered design the way it will look in use, or to show it to your team: Open the image and click **Show on a device** at the top. It opens in Mockup Studio on a phone, a tablet or a laptop, chosen by the image's shape; there you can turn the device, change the background and download a picture or a video. **Back to the request** returns you. It works for images, not for PDFs, and it asks you to send or remove any pin notes you haven't sent first.",
           },
         ],
       },
@@ -1214,6 +1268,190 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
           {
             type: "p",
             text: "Creatives can also share their own moodboards with you, and you're notified when they do. These appear on the request and in your Moodboards list as **From your creative**, and you can look through them but not change them.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    slug: "tools",
+    title: "Tools",
+    summary: "Every tool you can use in brandbite on one page, and which ones are in your sidebar.",
+    category: "Workspace",
+    routes: ["/customer/tools", "/customer/tools/brand-voice-copy"],
+    keywords: ["all tools", "hub", "apps", "soon", "coming soon", "search", "find a tool"],
+    related: ["ai-tools", "moodboards"],
+    sections: [
+      {
+        heading: "Finding a tool",
+        blocks: [
+          {
+            type: "p",
+            text: "**All tools**, under **Tools** in the sidebar, lists every tool you can use, grouped by what it is for. Click a card to open the tool.",
+          },
+          {
+            type: "list",
+            items: [
+              {
+                term: "Find a tool",
+                text: "type part of a tool's name or what it does to narrow the list.",
+              },
+              {
+                term: "Category buttons",
+                text: "show one group at a time. **All** brings every group back.",
+              },
+            ],
+          },
+          {
+            type: "tip",
+            text: "The tools you are likely to open most, **AI Tools**, **Color Studio** and **Mockup Studio**, also sit in the sidebar under **All tools**.",
+          },
+        ],
+      },
+      {
+        heading: "What the labels mean",
+        blocks: [
+          {
+            type: "list",
+            items: [
+              {
+                term: "Soon",
+                text: "the tool is being built. Its card has a dashed outline and can't be opened yet.",
+              },
+              {
+                term: "Uses tokens",
+                text: "each use is paid from your company's token balance. The tool shows the cost before you run it.",
+              },
+            ],
+          },
+        ],
+      },
+      {
+        heading: "Mockup Studio",
+        blocks: [
+          {
+            type: "p",
+            text: "**Mockup Studio** puts a screenshot or a screen recording on a 3D phone, tablet or laptop. Choose an image or a video, pick the device and the angle (or drag the device to turn it), set the background and download a PNG. Your file stays in your browser; it is not uploaded.",
+          },
+          {
+            type: "list",
+            items: [
+              {
+                term: "Background",
+                text: "when you are signed in, the colors from your **Brand guide** are offered first, above the presets. **Transparent** downloads the device with nothing behind it.",
+              },
+              {
+                term: "Download PNG · 1080p",
+                text: "free for everyone.",
+              },
+              {
+                term: "Download PNG · 4K",
+                text: "available while your company is on a brandbite plan. On a plan, your downloads also carry no brandbite mark; without one, they have a small mark in the corner.",
+              },
+              {
+                term: "Motion",
+                text: "**Slow turn**, **Float** or **Slide in** move the device. **Play** previews the motion; a PNG captures the moment you see.",
+              },
+              {
+                term: "Download video · 1080p",
+                text: "available on a plan, once a motion is picked or a video is on the screen. It records as it plays, so keep the tab open until it finishes: 6 seconds for a motion, or the length of your screen recording (between 3 and 20 seconds). The file is MP4 where your browser can record it, otherwise WebM. Video can't be transparent; a transparent background is recorded as white.",
+              },
+            ],
+          },
+        ],
+      },
+      {
+        heading: "Social resizer, Image converter, QR code, Type scale and Gradient generator",
+        blocks: [
+          {
+            type: "p",
+            text: "These four work in your browser: the files you choose are not uploaded. When you are signed in, the colors from your **Brand guide** are offered first wherever a tool asks for a color.",
+          },
+          {
+            type: "list",
+            items: [
+              {
+                term: "Social resizer",
+                text: "choose one image, switch on the platforms you post to and tick the sizes. **Crop to fill** cuts the edges: press **Adjust** on a size to drag the image and zoom until the frame holds the part you want, and **Use for every size** to keep that position everywhere. **Fit inside** keeps the whole image and fills the rest with a color. Download one size from its card, or all of them as a zip. Click a size's picture to see it large. On a brandbite plan, **Resize with AI** on a size has the AI lay your design out again for that shape instead of cutting it. The AI redraws the picture, so read the text and look at faces and logos before you post it; **Compare** shows the cropped version, **Undo** goes back to it. Your company gets 10 AI resizes in any 24 hours; they use no tokens. A resize that fails still counts.",
+              },
+              {
+                term: "Image converter",
+                text: "choose up to 30 PNG, JPG or WebP images, pick the format to convert to, the quality and, if you like, a maximum width. **Convert** shows each file's old and new size; download them one by one or as a zip.",
+              },
+              {
+                term: "QR code",
+                text: "type a link or text, pick the code and background colors and a shape, and add a logo if you want one. Download it as SVG (best for print) or PNG. The link is stored in the code itself, so the code doesn't expire and scans aren't counted.",
+              },
+              {
+                term: "Type scale",
+                text: "set your body size and pick a ratio to get heading and text sizes that fit together, shown as a list and in a sample page. **Fluid sizes for phones** makes headings shrink on small screens. Choose **CSS**, **Tailwind** or **Text** under **Copy as** and press **Copy**.",
+              },
+              {
+                term: "Gradient generator",
+                text: "part of Color Studio. Set up to six colors, choose linear or radial and the angle, then copy the CSS or download a PNG. **Use my brand colors** starts from your Brand guide.",
+              },
+            ],
+          },
+        ],
+      },
+      {
+        heading: "Brand-voice copy",
+        blocks: [
+          {
+            type: "p",
+            text: "**Brand-voice copy** writes short marketing text the way your Brand guide says your brand talks. It opens inside the dashboard and is included while your company is on a brandbite plan.",
+          },
+          {
+            type: "list",
+            items: [
+              {
+                term: "Write",
+                text: "choose what you need (**Social caption**, **Headline**, **Slogan**, **Ad copy**, **Product description** or **Email subject line**), describe what it is for under **What is it for?** and press **Write 3 options**. For captions, ads and product descriptions you can also pick a **Length**.",
+              },
+              {
+                term: "Use",
+                text: "**Copy** copies an option. For a caption or an ad, **Preview as a post** opens it in Post and ad preview.",
+              },
+              {
+                term: "Your voice",
+                text: "the panel **Your brand's voice** shows what the tool reads from your Brand guide. If your guide doesn't describe your voice yet, the copy is written in a plain style; add tone words, notes or a sample of your writing in the Brand guide to change that.",
+              },
+              {
+                term: "Limits",
+                text: "your company gets 10 writing runs a day, shared by everyone in it. A run counts only when the copy is written; one that fails is not counted. The tool uses only the facts you give it, so include any offer, price or date yourself, and read the result before you publish it.",
+              },
+            ],
+          },
+        ],
+      },
+      {
+        heading: "Logo pack, Email signature and Post and ad preview",
+        blocks: [
+          {
+            type: "list",
+            items: [
+              {
+                term: "Logo pack",
+                text: "choose your logo (an SVG is best), or **Use the logo from my brand guide** when your brand guide has one, and pick a background color for the icons. **Download PNG** gives one 512 pixel PNG. **Download the full pack**, available while your company is on a brandbite plan, is a zip with the logo in its own colors, black and white at three sizes, a favicon set, an app icon, a profile image and a note on what each file is for. **See it in use** shows the logo on a business card, a phone home screen and a browser tab; **On a phone**, **On a laptop** and **On a tablet** open it on a 3D device in Mockup Studio.",
+              },
+              {
+                term: "Email signature",
+                text: "pick one of six templates, fill in your details and adjust the accent color, text size and font. You can add an extra line and LinkedIn, Instagram and X links. Your company name and first brand color are filled in for you. **Copy signature** copies it ready to paste into your mail app; **Copy HTML** and **Download HTML** give the code. A logo shows only from a web address, so paste the https address of your logo on your own website: a PNG or JPG under 2 MB (mail apps don't show SVG). The preview tells you if the address can't be loaded. Nothing you type is saved.",
+              },
+              {
+                term: "Post and ad preview",
+                text: "choose an image and where it will appear to see it on a phone screen, as a post in a feed or a full-screen story. Your company name and brand guide logo are filled in as the account; change the name, username or picture as you like. Type the caption to see where it is cut, set or shuffle the like, comment and share numbers, and switch **Type** to **Ad** to add “Sponsored” and a button. For stories, **Show the areas the app covers** shades the parts hidden by the app's own buttons. **Download PNG** saves the screen; **Open on a 3D phone** takes it to Mockup Studio; **Back to Post and ad preview** there returns to your post as you left it. The screen shows layout, with made-up numbers and comments; it is not a copy of any app.",
+              },
+            ],
+          },
+        ],
+      },
+      {
+        heading: "Tools that open outside the dashboard",
+        blocks: [
+          {
+            type: "p",
+            text: "**Color Studio**, **Gradient generator**, **Mockup Studio**, **Social resizer**, **Image converter**, **QR code**, **Type scale**, **Logo pack**, **Email signature**, **Post and ad preview**, **Brand kit**, **Brand playlist**, **Size guide**, **Templates**, **Brief generator** and **Cost calculator** open on our public site, so the sidebar is not there. Use your browser's back button to return to the dashboard.",
           },
         ],
       },

@@ -11,12 +11,10 @@
 import type { ComponentType, SVGProps } from "react";
 import {
   IconAiSettings,
-  IconAiTools,
   IconBalance,
   IconBoard,
   IconBrandGuide,
   IconCatalog,
-  IconColorStudio,
   IconCompanies,
   IconConsultation,
   IconConsultations,
@@ -35,6 +33,8 @@ import {
   IconTokens,
   IconWithdrawals,
 } from "./nav-icons";
+import { IconStats, IconTools, TOOL_ICONS } from "@/components/tools/tool-icons";
+import { allToolsHref, pinnedTools, toolHref, type ToolRole } from "@/lib/tools/registry";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -66,6 +66,8 @@ export type NavConfig = {
   roleLabel?: string;
   homeHref: string;
   sections: NavSection[];
+  /** Pinned to the bottom of the sidebar, above the account menu. */
+  footerItems?: NavLeaf[];
 };
 
 // ---------------------------------------------------------------------------
@@ -171,17 +173,36 @@ export const ADMIN_NAV: NavConfig = {
 };
 
 // ---------------------------------------------------------------------------
-// Customer — THE big fix. 10 flat items → 3 natural sections.
+// Tools — "All tools" plus the role's pinned tools, from the hub registry
+// (lib/tools/registry.ts). Pin or unpin a tool there, not here.
+// ---------------------------------------------------------------------------
+
+function toolsSection(role: ToolRole): NavSection {
+  return {
+    label: "Tools",
+    items: [
+      { href: allToolsHref(role), label: "All tools", icon: IconTools },
+      ...pinnedTools(role).map((tool) => ({
+        href: toolHref(tool, role)!,
+        label: tool.name,
+        icon: TOOL_ICONS[tool.icon],
+      })),
+    ],
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Customer — THE big fix. 10 flat items → natural sections.
 // ---------------------------------------------------------------------------
 
 export const CUSTOMER_NAV: NavConfig = {
   brand: "brandbite",
-  homeHref: "/customer/board",
+  homeHref: "/customer",
   sections: [
     {
       label: "Workspace",
       items: [
-        { href: "/customer", label: "Overview", icon: IconOverview },
+        { href: "/customer", label: "Home", icon: IconOverview },
         {
           href: "/customer/board",
           label: "Board",
@@ -190,10 +211,9 @@ export const CUSTOMER_NAV: NavConfig = {
         },
         { href: "/customer/brand", label: "Brand guide", icon: IconBrandGuide },
         { href: "/customer/moodboards", label: "Moodboards", icon: IconMoodboards },
-        { href: "/customer/ai-tools", label: "AI Tools", icon: IconAiTools },
-        { href: "/colors", label: "Color Studio", icon: IconColorStudio },
       ],
     },
+    toolsSection("customer"),
     {
       label: "Billing",
       items: [
@@ -202,16 +222,11 @@ export const CUSTOMER_NAV: NavConfig = {
         { href: "/customer/consultation", label: "Consultation", icon: IconConsultation },
       ],
     },
-    {
-      label: "Account",
-      items: [
-        { href: "/customer/profile", label: "Profile", icon: IconMembers },
-        { href: "/customer/members", label: "Members", icon: IconMembers },
-        { href: "/customer/settings", label: "Settings", icon: IconSettings },
-        { href: "/customer/faq", label: "FAQ", icon: IconFaq },
-        { href: "/customer/support", label: "Support", icon: IconSupport },
-      ],
-    },
+  ],
+  // Profile is in the account menu, Members under Settings, the FAQ under Support.
+  footerItems: [
+    { href: "/customer/settings", label: "Settings", icon: IconSettings },
+    { href: "/customer/support", label: "Support", icon: IconSupport },
   ],
 };
 
@@ -222,12 +237,12 @@ export const CUSTOMER_NAV: NavConfig = {
 export const CREATIVE_NAV: NavConfig = {
   brand: "brandbite",
   roleLabel: "Creative",
-  homeHref: "/creative/board",
+  homeHref: "/creative",
   sections: [
     {
       label: "Workspace",
       items: [
-        { href: "/creative", label: "Overview", icon: IconOverview },
+        { href: "/creative", label: "Home", icon: IconOverview },
         {
           href: "/creative/board",
           label: "Board",
@@ -236,25 +251,22 @@ export const CREATIVE_NAV: NavConfig = {
         },
         { href: "/creative/moodboards", label: "Moodboards", icon: IconMoodboards },
         { href: "/creative/portfolio", label: "Portfolio", icon: IconPortfolio },
-        { href: "/colors", label: "Color Studio", icon: IconColorStudio },
       ],
     },
+    toolsSection("creative"),
     {
       label: "Earnings",
       items: [
         { href: "/creative/balance", label: "Balance", icon: IconBalance },
         { href: "/creative/withdrawals", label: "Withdrawals", icon: IconWithdrawals },
+        { href: "/creative/stats", label: "Stats", icon: IconStats },
       ],
     },
-    {
-      label: "Account",
-      items: [
-        { href: "/creative/profile", label: "Profile", icon: IconMembers },
-        { href: "/creative/settings", label: "Settings", icon: IconSettings },
-        { href: "/creative/faq", label: "FAQ", icon: IconFaq },
-        { href: "/creative/support", label: "Support", icon: IconSupport },
-      ],
-    },
+  ],
+  // Profile is in the account menu, the FAQ under Support.
+  footerItems: [
+    { href: "/creative/settings", label: "Settings", icon: IconSettings },
+    { href: "/creative/support", label: "Support", icon: IconSupport },
   ],
 };
 

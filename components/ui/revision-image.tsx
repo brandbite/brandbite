@@ -10,7 +10,9 @@ import React, { useCallback, useEffect, useState } from "react";
 import { PinOverlay, type PinData } from "./pin-overlay";
 import { PinSidebar, PinBottomSheet } from "./pin-sidebar";
 import { PdfCanvas } from "./pdf-canvas";
+import { usePathname, useRouter } from "next/navigation";
 import { downloadSingleAsset, downloadAssetsAsZip } from "@/lib/download-helpers";
+import { presentAssetOnDevice } from "@/lib/mockups/present";
 import { isImageAsset } from "@/lib/upload-helpers";
 import { useToast } from "@/components/ui/toast-provider";
 
@@ -413,6 +415,9 @@ function ImageLightbox({
   const [mobileAutoExpand, setMobileAutoExpand] = useState(false);
   const [resolvingPinId, setResolvingPinId] = useState<string | null>(null);
   const [lightboxDownloading, setLightboxDownloading] = useState(false);
+  const [presenting, setPresenting] = useState(false);
+  const router = useRouter();
+  const pathname = usePathname();
 
   // PDF paging. Images are single-page; PDFs render one page at a time and pins
   // are scoped to the page they were placed on.
@@ -800,6 +805,64 @@ function ImageLightbox({
               <DownloadIcon className="h-4 w-4" />
             )}
           </button>
+
+          {/* Show the current image on a 3D device in Mockup Studio */}
+          {isPdfAsset ? null : (
+            <button
+              type="button"
+              onClick={async () => {
+                // Notes that haven't been sent would be lost by leaving the page.
+                if (Object.values(pinsPerAsset).some((pins) => pins.some((p) => !p.id))) {
+                  showToast({
+                    type: "error",
+                    title: "Send or remove your notes first",
+                    description: "Opening the device view leaves this page.",
+                  });
+                  return;
+                }
+                setPresenting(true);
+                try {
+                  await presentAssetOnDevice({
+                    id: asset.id,
+                    name: asset.originalName || `image-${index + 1}`,
+                    returnTo: pathname ?? "",
+                  });
+                  router.push("/mockups");
+                } catch (err) {
+                  console.error("[Lightbox] show on device error:", err);
+                  showToast({
+                    type: "error",
+                    title: "Couldn't open this on a device",
+                    description: "Download the image and add it in Mockup Studio instead.",
+                  });
+                  setPresenting(false);
+                }
+              }}
+              disabled={presenting}
+              className="flex h-9 items-center gap-2 rounded-full bg-[var(--bb-bg-page)]/10 px-3 text-xs font-medium text-white/80 transition-colors hover:bg-[var(--bb-bg-page)]/20 hover:text-white disabled:opacity-50"
+              title="Opens this image on a phone, tablet or laptop in Mockup Studio"
+            >
+              {presenting ? (
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+              ) : (
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-4 w-4"
+                  aria-hidden="true"
+                >
+                  <rect x="5.5" y="2.5" width="9" height="15" rx="2" />
+                  <path d="M9 15h2" />
+                </svg>
+              )}
+              Show on a device
+            </button>
+          )}
 
           {/* Close button */}
           <button
