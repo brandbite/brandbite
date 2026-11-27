@@ -59,6 +59,7 @@ export const TOOL_ICONS: Record<ToolIconKey, Icon> = {
   typeScale: glyph("M5 6h14M12 6v13M9 19h6"),
   logoPack: glyph("M12 3l9 5-9 5-9-5zM3 12l9 5 9-5M3 16l9 5 9-5"),
   signature: glyph("M4 6h16v12H4zM4 7l8 6 8-6"),
+  newsletter: glyph("M5 3h14v18H5zM8 7h8v4H8zM8 14h8M8 17h5"),
   qr: glyph("M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 18h2v2h-2z"),
   mockup: glyph("M8 3h8a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM11 18h2"),
   copy: glyph("M4 20l4-1 11-11-3-3L5 16zM14 7l3 3"),

@@ -22,6 +22,13 @@ export type ToolAccess = ToolEntitlement & {
   /** "Extend with AI" is on for this visitor: on a plan, and the image model is set up. */
   aiExtend: boolean;
   aiExtendDailyLimit: number;
+  /** The newsletter builder's "Write with AI" is on for this visitor: on a plan, text model set up. */
+  newsletterAi: boolean;
+  newsletterAiDailyLimit: number;
+  /** They can upload pictures for a newsletter: on a plan, public asset domain set up. */
+  newsletterUpload: boolean;
+  /** They can send themselves a test newsletter: on a plan, email sending set up. */
+  newsletterTest: boolean;
 };
 
 const SIGNED_OUT: ToolAccess = {
@@ -33,24 +40,41 @@ const SIGNED_OUT: ToolAccess = {
   hasBrandLogo: false,
   aiExtend: false,
   aiExtendDailyLimit: 10,
+  newsletterAi: false,
+  newsletterAiDailyLimit: 10,
+  newsletterUpload: false,
+  newsletterTest: false,
 };
 
 /** Whether the visitor is signed in and on a plan, and their brand guide colors. Signed out until known. */
 export function useToolAccess(): ToolAccess {
-  const [access, setAccess] = useState<ToolAccess>(SIGNED_OUT);
+  return useToolAccessStatus().access;
+}
+
+/**
+ * The same, with `ready` turning true once the answer is in (or couldn't be
+ * had), for tools that must not decide anything on the first "signed out".
+ */
+export function useToolAccessStatus(): { access: ToolAccess; ready: boolean } {
+  const [state, setState] = useState<{ access: ToolAccess; ready: boolean }>({
+    access: SIGNED_OUT,
+    ready: false,
+  });
   useEffect(() => {
     let live = true;
     fetch("/api/tools/entitlement", { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : null))
       .then((json: ToolAccess | null) => {
-        if (live && json) setAccess({ ...SIGNED_OUT, ...json });
+        if (live) setState({ access: json ? { ...SIGNED_OUT, ...json } : SIGNED_OUT, ready: true });
       })
-      .catch(() => {});
+      .catch(() => {
+        if (live) setState({ access: SIGNED_OUT, ready: true });
+      });
     return () => {
       live = false;
     };
   }, []);
-  return access;
+  return state;
 }
 
 /**

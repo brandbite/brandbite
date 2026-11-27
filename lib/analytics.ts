@@ -33,6 +33,9 @@ const UNTRACKED_PREFIXES = [
   "/verify-email",
   "/talent/schedule",
   "/meetings",
+  // The newsletter editor is a workspace (its address carries a kept newsletter's id);
+  // /newsletter-builder itself is a marketing page and stays tracked.
+  "/newsletter-builder/editor",
   "/api",
 ];
 

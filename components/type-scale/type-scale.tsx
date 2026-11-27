@@ -1,6 +1,6 @@
 // -----------------------------------------------------------------------------
 // @file: components/type-scale/type-scale.tsx
-// @purpose: Type scale generator: choose a body size and a ratio, see every
+// @purpose: Type scale generator, in three steps (settings, preview, export): choose a body size and a ratio, see every
 //           heading and text size together, then copy the scale as CSS
 //           variables, a Tailwind theme block or plain text. Fluid sizes grow
 //           between a phone and a desktop width. Runs in the browser.
@@ -12,9 +12,10 @@ import { useId, useState } from "react";
 
 import { CopyIcon } from "@/components/colors/studio/icons";
 import { studioButtonClasses } from "@/components/colors/studio/studio-button";
+import { StepHeading } from "@/components/tools/tool-page";
 import {
-  Segmented,
   TOOL_ERROR,
+  TOOL_FOCUS,
   TOOL_HINT,
   TOOL_INPUT,
   TOOL_LABEL,
@@ -33,7 +34,6 @@ import {
   scaleCss,
   scaleTailwind,
   scaleText,
-  scaleValues,
   scaleWarning,
   typeScale,
 } from "@/lib/type-scale/scale";
@@ -53,12 +53,23 @@ const OUTPUTS: { id: Output; label: string }[] = [
   { id: "text", label: "Text" },
 ];
 
-const DEFAULT_SAMPLE = "Good design is as little design as possible";
+const DEFAULT_SAMPLE = "Set the tone.";
+
+/** "Heading 1" → "H1"; the other steps keep their name. */
+const shortLabel = (label: string) => label.replace(/^Heading /, "H");
+
+const TAB = `flex h-11 items-center justify-center rounded-[10px] border px-5 text-sm font-semibold whitespace-nowrap transition-colors ${TOOL_FOCUS}`;
+const TAB_ON = "border-[var(--cs-selected)] bg-[var(--cs-soft)] text-[var(--cs-soft-text)]";
+const TAB_OFF = "border-[var(--cs-border)] bg-[var(--cs-surface)] hover:border-[var(--cs-text)]";
+const RADIO_ROW =
+  "flex min-h-12 items-center gap-3 rounded-[10px] px-3 py-1 text-sm leading-5 font-medium";
 
 export function TypeScale() {
   const ids = useId();
   const [base, setBase] = useState("16");
   const [ratio, setRatio] = useState("1.25");
+  /** True while the ratio is typed by hand instead of picked from the list. */
+  const [custom, setCustom] = useState(false);
   const [font, setFont] = useState<FontId>("sans");
   const [sample, setSample] = useState("");
   const [fluid, setFluid] = useState(false);
@@ -70,7 +81,6 @@ export function TypeScale() {
   const r = cleanRatio(ratio);
   const steps = typeScale(b, r);
   const fluidOptions = fluid ? { ...DEFAULT_FLUID, minRatio: cleanRatio(minRatio) } : null;
-  const values = scaleValues(b, r, fluidOptions);
   const warning = fluid ? null : scaleWarning(steps);
   const preset = ratioPreset(r);
   const stack = FONTS.find((f) => f.id === font)?.stack ?? FONTS[0].stack;
@@ -95,263 +105,370 @@ export function TypeScale() {
     }
   };
 
+  const usingPreset = !custom && preset !== null;
+
   return (
-    <section
-      aria-label="Type scale generator"
-      className="grid grid-cols-[360px_minmax(0,1fr)] gap-6 max-[1023px]:grid-cols-1"
-    >
-      <div className={`flex flex-col gap-6 ${TOOL_PANEL}`}>
+    <section aria-label="Type scale generator" className="flex flex-col gap-8">
+      <div className="grid grid-cols-[340px_minmax(0,1fr)] items-start gap-6 max-[1023px]:grid-cols-1">
         <div>
-          <label htmlFor={`${ids}-base`} className={TOOL_LABEL}>
-            Body size (px)
-          </label>
-          <input
-            id={`${ids}-base`}
-            type="number"
-            inputMode="decimal"
-            min={BASE_MIN}
-            max={BASE_MAX}
-            step={1}
-            value={base}
-            onChange={(event) => setBase(event.target.value)}
-            onBlur={() => setBase(String(b))}
-            className={`mt-2 ${TOOL_INPUT} tabular-nums`}
+          <StepHeading
+            number={1}
+            title="Settings"
+            hint="Choose your base size, ratio and options."
           />
-          <p className={`mt-2 ${TOOL_HINT}`}>
-            The size of your paragraphs. 16 is the browser default; {BASE_MIN} to {BASE_MAX} is
-            allowed.
-          </p>
-        </div>
-
-        <div>
-          <label htmlFor={`${ids}-preset`} className={TOOL_LABEL}>
-            Ratio
-          </label>
-          <select
-            id={`${ids}-preset`}
-            value={preset?.id ?? "custom"}
-            onChange={(event) => {
-              const chosen = RATIOS.find((item) => item.id === event.target.value);
-              if (chosen) setRatio(String(chosen.value));
-            }}
-            className={`mt-2 ${TOOL_INPUT}`}
-          >
-            {RATIOS.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.label} · {item.value}
-              </option>
-            ))}
-            {preset ? null : <option value="custom">Custom · {r}</option>}
-          </select>
-          <label htmlFor={`${ids}-ratio`} className="mt-3 block text-sm leading-5 font-medium">
-            Or type your own
-          </label>
-          <input
-            id={`${ids}-ratio`}
-            type="number"
-            inputMode="decimal"
-            min={RATIO_MIN}
-            max={RATIO_MAX}
-            step={0.005}
-            value={ratio}
-            onChange={(event) => setRatio(event.target.value)}
-            onBlur={() => setRatio(String(r))}
-            className={`mt-1 ${TOOL_INPUT} tabular-nums`}
-          />
-          <p className={`mt-2 ${TOOL_HINT}`}>
-            Each size is the one below it times this number. A small ratio gives calm pages; a large
-            one gives dramatic headings.
-          </p>
-        </div>
-
-        <div>
-          <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm leading-5 font-medium">
-            <input
-              type="checkbox"
-              checked={fluid}
-              onChange={(event) => setFluid(event.target.checked)}
-              className="h-5 w-5 accent-[var(--cs-text)]"
-            />
-            Fluid sizes for phones
-          </label>
-          {fluid ? (
-            <div className="mt-2">
-              <label htmlFor={`${ids}-min`} className="text-sm leading-5 font-medium">
-                Ratio on a phone
+          <div className={`mt-4 flex flex-col gap-6 ${TOOL_PANEL}`}>
+            <div>
+              <label htmlFor={`${ids}-base`} className={TOOL_LABEL}>
+                Base size
               </label>
-              <input
-                id={`${ids}-min`}
-                type="number"
-                inputMode="decimal"
-                min={RATIO_MIN}
-                max={RATIO_MAX}
-                step={0.005}
-                value={minRatio}
-                onChange={(event) => setMinRatio(event.target.value)}
-                onBlur={() => setMinRatio(String(cleanRatio(minRatio)))}
-                className={`mt-1 ${TOOL_INPUT} tabular-nums`}
-              />
+              <div className="relative mt-2">
+                <input
+                  id={`${ids}-base`}
+                  type="number"
+                  inputMode="decimal"
+                  min={BASE_MIN}
+                  max={BASE_MAX}
+                  step={1}
+                  value={base}
+                  onChange={(event) => setBase(event.target.value)}
+                  onBlur={() => setBase(String(b))}
+                  className={`${TOOL_INPUT} pr-10 tabular-nums`}
+                />
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute top-0 right-3 flex h-11 items-center text-sm text-[var(--cs-muted)]"
+                >
+                  px
+                </span>
+              </div>
               <p className={`mt-2 ${TOOL_HINT}`}>
-                Headings use this ratio on a {DEFAULT_FLUID.minViewport}px screen and grow smoothly
-                to your ratio at {DEFAULT_FLUID.maxViewport}px. The preview shows the desktop sizes.
+                Body text size ({BASE_MIN} – {BASE_MAX}px). 16 is the browser default.
               </p>
             </div>
-          ) : (
-            <p className={TOOL_HINT}>
-              Headings shrink on small screens and grow on large ones, with no breakpoints.
-            </p>
-          )}
-        </div>
 
-        <Segmented<FontId>
-          label="Preview font"
-          options={FONTS.map((f) => ({ id: f.id, label: f.label }))}
-          value={font}
-          onChange={setFont}
-        />
-
-        <div>
-          <label htmlFor={`${ids}-sample`} className={TOOL_LABEL}>
-            Preview text
-          </label>
-          <input
-            id={`${ids}-sample`}
-            value={sample}
-            maxLength={80}
-            placeholder={DEFAULT_SAMPLE}
-            onChange={(event) => setSample(event.target.value)}
-            className={`mt-2 ${TOOL_INPUT}`}
-          />
-        </div>
-      </div>
-
-      <div className="flex min-w-0 flex-col gap-4">
-        {warning ? (
-          <p role="status" className={`${TOOL_PANEL} ${TOOL_ERROR}`}>
-            {warning}
-          </p>
-        ) : null}
-
-        <div className={TOOL_PANEL}>
-          <h2 className={TOOL_LABEL}>Your scale</h2>
-          <ul className="mt-3 flex flex-col divide-y divide-[var(--cs-border)]">
-            {steps
-              .slice()
-              .reverse()
-              .map((step) => (
-                <li key={step.id} className="flex flex-col gap-1 py-4 first:pt-0 last:pb-0">
-                  <p className="flex flex-wrap items-baseline gap-x-3 text-sm leading-5 tabular-nums">
-                    <span className="font-semibold">{step.label}</span>
-                    <span className="text-[var(--cs-muted)]">
-                      {step.px}px · {step.rem}rem · line height {step.lineHeight}
-                    </span>
-                    <span className="text-[var(--cs-muted)]">{step.role}</span>
-                  </p>
-                  <p
-                    className="overflow-hidden text-ellipsis whitespace-nowrap"
-                    style={{
-                      fontFamily: stack,
-                      fontSize: step.px,
-                      lineHeight: step.lineHeight,
-                      fontWeight: step.step > 0 ? 600 : 400,
+            <fieldset>
+              <legend className={TOOL_LABEL}>Ratio</legend>
+              <div className="mt-2 flex flex-col gap-1">
+                <div className={`${RADIO_ROW} ${usingPreset ? "bg-[var(--cs-soft)]" : ""}`}>
+                  <input
+                    type="radio"
+                    name={`${ids}-ratio-kind`}
+                    aria-label="Choose a ratio from the list"
+                    checked={usingPreset}
+                    onChange={() => {
+                      setCustom(false);
+                      if (!preset) setRatio("1.25");
                     }}
+                    className="h-5 w-5 shrink-0 accent-[var(--cs-selected)]"
+                  />
+                  <select
+                    aria-label="Ratio from the list"
+                    value={preset?.id ?? "major-third"}
+                    onChange={(event) => {
+                      const chosen = RATIOS.find((item) => item.id === event.target.value);
+                      if (!chosen) return;
+                      setCustom(false);
+                      setRatio(String(chosen.value));
+                    }}
+                    className={`${TOOL_INPUT} !h-10 min-w-0 flex-1`}
                   >
-                    {text}
-                  </p>
-                </li>
-              ))}
-          </ul>
-        </div>
+                    {RATIOS.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.label} ({item.value})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className={`${RADIO_ROW} ${usingPreset ? "" : "bg-[var(--cs-soft)]"}`}>
+                  <input
+                    id={`${ids}-custom`}
+                    type="radio"
+                    name={`${ids}-ratio-kind`}
+                    checked={!usingPreset}
+                    onChange={() => setCustom(true)}
+                    className="h-5 w-5 shrink-0 accent-[var(--cs-selected)]"
+                  />
+                  <label htmlFor={`${ids}-custom`} className="flex-1 cursor-pointer">
+                    Custom
+                  </label>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    aria-label="Custom ratio"
+                    min={RATIO_MIN}
+                    max={RATIO_MAX}
+                    step={0.005}
+                    value={ratio}
+                    onFocus={() => setCustom(true)}
+                    onChange={(event) => {
+                      setCustom(true);
+                      setRatio(event.target.value);
+                    }}
+                    onBlur={() => setRatio(String(r))}
+                    className={`${TOOL_INPUT} !h-10 !w-24 tabular-nums`}
+                  />
+                </div>
+              </div>
+              <p className={`mt-2 ${TOOL_HINT}`}>
+                Each size is the one below it times this number. A small ratio gives calm pages; a
+                large one gives dramatic headings.
+              </p>
+            </fieldset>
 
-        <div className={TOOL_PANEL}>
-          <h2 className={TOOL_LABEL}>In a page</h2>
-          <div
-            className="mt-3 overflow-hidden rounded-xl border border-[var(--cs-border)] bg-white p-6 text-[#292827]"
-            style={{ fontFamily: stack }}
-          >
-            {(
-              [
-                ["h1", "A page title that sets the tone", 600],
-                [
-                  "base",
-                  "The opening paragraph explains what the page is about. It is set in your body size, the one every other size is measured from.",
-                  400,
-                ],
-                ["h2", "A section heading", 600],
-                [
-                  "base",
-                  "Sections break a long page into parts a reader can scan. The step between this heading and the text under it comes from your ratio.",
-                  400,
-                ],
-                ["h4", "A card title", 600],
-                ["sm", "Secondary text sits one step under the body size.", 400],
-                ["xs", "Captions and labels use the smallest size.", 400],
-              ] as const
-            ).map(([id, line, weight], index) => {
-              const step = steps.find((s) => s.id === id)!;
-              return (
-                <p
-                  key={index}
-                  style={{
-                    fontSize: step.px,
-                    lineHeight: step.lineHeight,
-                    fontWeight: weight,
-                    marginTop: index === 0 ? 0 : step.step > 0 ? "0.9em" : "0.5em",
-                    overflowWrap: "anywhere",
-                  }}
+            <div>
+              <div className="flex items-center justify-between gap-3">
+                <span id={`${ids}-fluid`} className={TOOL_LABEL}>
+                  Fluid scale
+                </span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={fluid}
+                  aria-labelledby={`${ids}-fluid`}
+                  onClick={() => setFluid((on) => !on)}
+                  className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${TOOL_FOCUS} ${
+                    fluid ? "bg-[var(--cs-selected)]" : "bg-[#C9C5BE]"
+                  }`}
                 >
-                  {line}
+                  <span
+                    aria-hidden
+                    className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${
+                      fluid ? "translate-x-5" : ""
+                    }`}
+                  />
+                </button>
+              </div>
+              {fluid ? (
+                <div className="mt-2">
+                  <label htmlFor={`${ids}-min`} className="text-sm leading-5 font-medium">
+                    Ratio on a phone
+                  </label>
+                  <input
+                    id={`${ids}-min`}
+                    type="number"
+                    inputMode="decimal"
+                    min={RATIO_MIN}
+                    max={RATIO_MAX}
+                    step={0.005}
+                    value={minRatio}
+                    onChange={(event) => setMinRatio(event.target.value)}
+                    onBlur={() => setMinRatio(String(cleanRatio(minRatio)))}
+                    className={`mt-1 ${TOOL_INPUT} tabular-nums`}
+                  />
+                  <p className={`mt-2 ${TOOL_HINT}`}>
+                    Headings use this ratio on a {DEFAULT_FLUID.minViewport}px screen and grow
+                    smoothly to your ratio at {DEFAULT_FLUID.maxViewport}px. The preview shows the
+                    desktop sizes.
+                  </p>
+                </div>
+              ) : (
+                <p className={`mt-1 ${TOOL_HINT}`}>
+                  Headings shrink on small screens and grow on large ones, with no breakpoints.
                 </p>
-              );
-            })}
+              )}
+            </div>
+
+            <fieldset>
+              <legend className={TOOL_LABEL}>Font</legend>
+              <div className="mt-2 flex gap-2">
+                {FONTS.map((f) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    aria-pressed={font === f.id}
+                    onClick={() => setFont(f.id)}
+                    className={`${TAB} flex-1 !px-2 ${font === f.id ? TAB_ON : TAB_OFF}`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+
+            <div>
+              <label htmlFor={`${ids}-sample`} className={TOOL_LABEL}>
+                Preview text
+              </label>
+              <input
+                id={`${ids}-sample`}
+                value={sample}
+                maxLength={80}
+                placeholder={DEFAULT_SAMPLE}
+                onChange={(event) => setSample(event.target.value)}
+                className={`mt-2 ${TOOL_INPUT}`}
+              />
+            </div>
           </div>
         </div>
 
-        <div className={TOOL_PANEL}>
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <Segmented<Output>
-              label="Copy as"
-              options={OUTPUTS}
-              value={output}
-              onChange={setOutput}
-            />
+        <div className="min-w-0">
+          <StepHeading
+            number={2}
+            title="Scale preview"
+            hint="A complete type hierarchy using your settings."
+          />
+          {warning ? (
+            <p role="status" className={`mt-4 ${TOOL_PANEL} !py-4 ${TOOL_ERROR}`}>
+              {warning}
+            </p>
+          ) : null}
+          <div className={`mt-4 ${TOOL_PANEL}`}>
+            <ul className="flex flex-col divide-y divide-[var(--cs-border)]">
+              {steps
+                .slice()
+                .reverse()
+                .map((step) => (
+                  <li
+                    key={step.id}
+                    className="grid grid-cols-[104px_minmax(0,1fr)_auto] items-center gap-4 py-3 first:pt-0 last:pb-0 max-[639px]:grid-cols-[84px_minmax(0,1fr)]"
+                  >
+                    <p className="text-sm leading-5">
+                      <span className="block font-semibold">{shortLabel(step.label)}</span>
+                      <span className="block text-[var(--cs-muted)]">{step.role}</span>
+                    </p>
+                    <p
+                      className="overflow-hidden text-ellipsis whitespace-nowrap"
+                      style={{
+                        fontFamily: stack,
+                        fontSize: step.px,
+                        lineHeight: step.lineHeight,
+                        fontWeight: step.step > 0 ? 600 : 400,
+                      }}
+                    >
+                      {text}
+                    </p>
+                    <p className="text-right text-sm leading-5 tabular-nums max-[639px]:col-span-2 max-[639px]:text-left">
+                      <span className="block font-medium">{step.px} px</span>
+                      <span className="block text-[var(--cs-muted)]">
+                        {step.rem} rem · line {step.lineHeight}
+                      </span>
+                    </p>
+                  </li>
+                ))}
+            </ul>
+          </div>
+
+          <details className={`group mt-4 ${TOOL_PANEL} !p-0`}>
+            <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-4 px-6 py-3 text-base leading-6 font-semibold max-[767px]:px-5 [&::-webkit-details-marker]:hidden">
+              See it in a page
+              <svg
+                aria-hidden
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="shrink-0 transition-transform group-open:rotate-180"
+              >
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            </summary>
+            <div className="px-6 pb-6 max-[767px]:px-5 max-[767px]:pb-5">
+              <div
+                className="overflow-hidden rounded-xl border border-[var(--cs-border)] bg-white p-6 text-[#292827]"
+                style={{ fontFamily: stack }}
+              >
+                {(
+                  [
+                    ["h1", "A page title that sets the tone", 600],
+                    [
+                      "base",
+                      "The opening paragraph explains what the page is about. It is set in your body size, the one every other size is measured from.",
+                      400,
+                    ],
+                    ["h2", "A section heading", 600],
+                    [
+                      "base",
+                      "Sections break a long page into parts a reader can scan. The step between this heading and the text under it comes from your ratio.",
+                      400,
+                    ],
+                    ["h4", "A card title", 600],
+                    ["sm", "Secondary text sits one step under the body size.", 400],
+                    ["xs", "Captions and labels use the smallest size.", 400],
+                  ] as const
+                ).map(([id, line, weight], index) => {
+                  const step = steps.find((s) => s.id === id)!;
+                  return (
+                    <p
+                      key={index}
+                      style={{
+                        fontSize: step.px,
+                        lineHeight: step.lineHeight,
+                        fontWeight: weight,
+                        marginTop: index === 0 ? 0 : step.step > 0 ? "0.9em" : "0.5em",
+                        overflowWrap: "anywhere",
+                      }}
+                    >
+                      {line}
+                    </p>
+                  );
+                })}
+              </div>
+            </div>
+          </details>
+        </div>
+      </div>
+
+      <div>
+        <StepHeading
+          number={3}
+          title="Export"
+          hint="Copy your type scale as CSS, Tailwind or plain text."
+        />
+        <div className={`mt-4 ${TOOL_PANEL}`}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <fieldset>
+              <legend className="sr-only">Copy as</legend>
+              <div className="flex flex-wrap gap-2">
+                {OUTPUTS.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    aria-pressed={output === item.id}
+                    onClick={() => setOutput(item.id)}
+                    className={`${TAB} ${output === item.id ? TAB_ON : TAB_OFF}`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
             <button
               type="button"
               onClick={() => void copy()}
-              className={studioButtonClasses("primary")}
+              className={`${studioButtonClasses("primary")} !h-12 !px-6`}
             >
               <CopyIcon />
-              Copy
+              Copy scale
             </button>
           </div>
           <pre
             tabIndex={0}
             aria-label="The scale as code"
-            className="mt-3 max-h-80 overflow-auto rounded-xl border border-[var(--cs-border)] bg-[var(--cs-background)] p-4 text-[13px] leading-5"
+            className="mt-4 max-h-96 overflow-auto rounded-xl border border-[var(--cs-border)] bg-[var(--cs-background)] p-4 text-[13px] leading-5"
           >
             <code>{code}</code>
           </pre>
           <p
             role="status"
-            className={`mt-2 min-h-5 text-sm leading-5 ${message?.kind === "error" ? "font-medium text-[#b42318]" : "text-[#256b3a]"}`}
+            className={`mt-2 text-sm leading-5 ${
+              message?.kind === "error"
+                ? "font-medium text-[#b42318]"
+                : message
+                  ? "text-[#256b3a]"
+                  : "text-[var(--cs-muted)]"
+            }`}
           >
-            {message?.text ?? ""}
+            {message?.text ??
+              (output === "text"
+                ? fluid
+                  ? "The text version lists the desktop sizes."
+                  : "A plain list for a brief or a brand guide."
+                : "Sizes are in rem, so text follows the size a reader has set in their browser.")}
           </p>
-          {output === "text" && fluid ? (
-            <p className={TOOL_HINT}>The text version lists the desktop sizes.</p>
-          ) : null}
-          {output !== "text" ? (
-            <ul className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm leading-5 text-[var(--cs-muted)] tabular-nums">
-              {values
-                .filter(({ step }) => ["h1", "h2", "base"].includes(step.id))
-                .reverse()
-                .map(({ step, value }) => (
-                  <li key={step.id}>
-                    {step.label}: <code>{value}</code>
-                  </li>
-                ))}
-            </ul>
-          ) : null}
         </div>
       </div>
     </section>

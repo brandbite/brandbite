@@ -1,16 +1,18 @@
 // -----------------------------------------------------------------------------
 // @file: app/mockups/page.tsx
 // @purpose: Mockup Studio: a free 3D device mockup generator. The tool is
-//           client-side; the guide below it is in the first HTML for search
-//           engines and readers.
+//           client-side; the steps and questions below it are in the first
+//           HTML for search engines and readers.
 // -----------------------------------------------------------------------------
 
 import type { Metadata } from "next";
-import Link from "next/link";
+import Image from "next/image";
 
 import { StudioShell } from "@/components/colors/studio/studio-shell";
 import { MockupStudio } from "@/components/mockups/mockup-studio";
 import { JsonLd } from "@/components/seo/json-ld";
+import { SwitchTool } from "@/components/tools/switch-tool";
+import { ToolFaq, ToolNote, ToolSteps, type ToolFaqItem } from "@/components/tools/tool-page";
 import { pageMetadata } from "@/lib/seo/metadata";
 import { breadcrumbJsonLd, webApplicationJsonLd } from "@/lib/seo/structured-data";
 
@@ -27,7 +29,28 @@ export const metadata: Metadata = pageMetadata({
   path: TOOL.path,
 });
 
-const STEPS = [
+const STRIP = [
+  {
+    title: "Add your screen",
+    text: "Upload a screenshot, an image or a short video.",
+    // An arrow up out of a tray.
+    icon: "M12 15V4M7 9l5-5 5 5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4",
+  },
+  {
+    title: "Set the scene",
+    text: "Choose a device, an angle and a background.",
+    // A phone.
+    icon: "M8 3h8a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM11 18h2",
+  },
+  {
+    title: "Export your mockup",
+    text: "Download an image or a video, ready to share.",
+    // An arrow down into a tray.
+    icon: "M12 4v11M7 10l5 5 5-5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4",
+  },
+];
+
+const HOW_TO = [
   {
     title: "Add your screenshot or screen recording",
     body: "Choose an image (PNG, JPG, WebP) or a video (MP4, WebM, MOV). It plays on the device's screen in your browser and is never uploaded.",
@@ -37,7 +60,7 @@ const STEPS = [
     body: "Phone, tablet or laptop. Start from a preset angle, then drag the device to turn it exactly how you want.",
   },
   {
-    title: "Set the background",
+    title: "Set the scene",
     body: "A solid color, a soft gradient or none at all. Signed-in brandbite customers also see their brand guide colors.",
   },
   {
@@ -54,17 +77,77 @@ const TIPS = [
   "Turn the shadow off on a transparent background if you plan to add your own.",
 ];
 
+const FAQ: ToolFaqItem[] = [
+  {
+    question: "Which files can I use?",
+    answer:
+      "An image (PNG, JPG or WebP, up to 15 MB) or a video (MP4, WebM or MOV, up to 200 MB). A video plays on the device's screen. The file stays in your browser and is never uploaded.",
+  },
+  {
+    question: "What is included for free?",
+    answer:
+      "Every device, angle, scene and motion, and PNG downloads at 1080p. Free downloads carry a small brandbite mark in the corner. Customers on a brandbite plan also get 4K downloads, video and no mark.",
+  },
+  {
+    question: "Can I export video?",
+    answer:
+      "Yes, on a brandbite plan. Pick a motion, or put a screen recording on the device, and download a 1080p video. It is saved as MP4 where your browser can record it and as WebM otherwise. Video has no transparency, so a transparent scene is recorded on white.",
+  },
+  {
+    question: "What is a device mockup?",
+    answer:
+      "A device mockup shows your app, website or design on the screen of a phone, tablet or laptop. It turns a flat screenshot into a picture people understand at a glance: this is a real product, and this is what using it looks like. Mockups are used on landing pages, in app store listings, in pitch decks and in social posts.",
+  },
+  {
+    question: "How do I make a 3D mockup?",
+    answer: (
+      <ol className="flex list-decimal flex-col gap-2 pl-5">
+        {HOW_TO.map((step) => (
+          <li key={step.title}>
+            <span className="font-semibold text-[var(--cs-text)]">{step.title}.</span> {step.body}
+          </li>
+        ))}
+      </ol>
+    ),
+  },
+  {
+    question: "How do I make a mockup look real?",
+    answer: (
+      <ul className="flex list-disc flex-col gap-2 pl-5">
+        {TIPS.map((tip) => (
+          <li key={tip}>{tip}</li>
+        ))}
+      </ul>
+    ),
+  },
+  {
+    question: "Can I use the mockups in my marketing?",
+    answer:
+      "Yes. The devices are our own generic designs, not copies of a real product, so they are safe to use in your marketing.",
+  },
+];
+
 export default function MockupStudioPage() {
   return (
     <StudioShell
-      label="MOCKUP STUDIO"
+      label="FREE TOOLS"
       nav={null}
-      title="3D device mockups"
-      accent="from a screenshot."
-      blurb="Put your screen on a phone, tablet or laptop. Turn it, set the background, download a PNG."
-      ctaHeading="Good mockup."
-      ctaHeadingAccent="Better design."
-      ctaBlurb="Need the screen itself designed? Send a request to brandbite and get it back on one simple subscription."
+      title="Mockup Studio."
+      accent="Your screen, on show."
+      accentBelow
+      blurb="Choose a device, set the scene and export your mockup."
+      action={<SwitchTool current="mockup-studio" />}
+      aside={
+        <Image
+          src="/tools/mockup-studio-hero.webp"
+          alt=""
+          width={732}
+          height={640}
+          priority
+          className="-my-4 h-[250px] w-auto max-[1023px]:h-[200px]"
+        />
+      }
+      closing="ready"
     >
       <JsonLd
         data={[
@@ -73,69 +156,16 @@ export default function MockupStudioPage() {
         ]}
       />
 
+      <ToolNote
+        title="Images and video are processed in your browser."
+        text="Your file is never uploaded."
+      />
+
       <MockupStudio />
 
-      <section
-        aria-labelledby="mockup-what-heading"
-        className="mt-6 rounded-2xl border border-[var(--cs-border)] bg-[var(--cs-surface)] p-8 max-[767px]:p-5"
-      >
-        <h2 id="mockup-what-heading" className="text-2xl leading-8 font-semibold">
-          What is a device mockup?
-        </h2>
-        <p className="mt-3 max-w-[760px] text-base leading-7">
-          A device mockup shows your app, website or design on the screen of a phone, tablet or
-          laptop. It turns a flat screenshot into a picture people understand at a glance: this is a
-          real product, and this is what using it looks like. Mockups are used on landing pages, in
-          app store listings, in pitch decks and in social posts.
-        </p>
+      <ToolSteps steps={STRIP} labelId="mockup-steps-heading" />
 
-        <h2 className="mt-8 text-2xl leading-8 font-semibold">How to make a 3D mockup</h2>
-        <ol className="mt-4 grid grid-cols-2 gap-x-8 gap-y-5 max-[767px]:grid-cols-1">
-          {STEPS.map((step, index) => (
-            <li key={step.title} className="flex gap-3">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--cs-soft)] text-sm font-semibold text-[var(--cs-soft-text)]">
-                {index + 1}
-              </span>
-              <div>
-                <h3 className="text-base leading-6 font-semibold">{step.title}</h3>
-                <p className="mt-1 text-base leading-6 text-[var(--cs-muted)]">{step.body}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
-
-        <h2 className="mt-8 text-2xl leading-8 font-semibold">Tips for a mockup that looks real</h2>
-        <ul className="mt-4 flex max-w-[760px] list-disc flex-col gap-2 pl-5 text-base leading-7">
-          {TIPS.map((tip) => (
-            <li key={tip}>{tip}</li>
-          ))}
-        </ul>
-
-        <h2 className="mt-8 text-2xl leading-8 font-semibold">Free and Pro</h2>
-        <p className="mt-3 max-w-[760px] text-base leading-7">
-          Downloads at 1080p are free and carry a small brandbite mark in the corner. Customers on a
-          brandbite plan also get 4K downloads, video and no mark. The devices are our own generic
-          designs, so they are safe to use in your marketing.
-        </p>
-
-        <h2 className="mt-8 text-2xl leading-8 font-semibold">Related free tools</h2>
-        <ul className="mt-3 flex flex-wrap gap-2">
-          {[
-            { href: "/sizes", label: "Social media size guide" },
-            { href: "/colors/color-palette-generator", label: "Color palette generator" },
-            { href: "/brief-generator", label: "Creative brief generator" },
-          ].map((link) => (
-            <li key={link.href}>
-              <Link
-                href={link.href}
-                className="flex h-11 items-center rounded-full border border-[var(--cs-border)] bg-[var(--cs-surface)] px-4 text-sm font-medium hover:border-[var(--cs-text)]"
-              >
-                {link.label}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </section>
+      <ToolFaq items={FAQ} labelId="mockup-faq-heading" />
     </StudioShell>
   );
 }

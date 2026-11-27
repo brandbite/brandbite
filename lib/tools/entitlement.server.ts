@@ -9,12 +9,15 @@ import { getCurrentUser } from "@/lib/auth";
 import { readBrandColors } from "@/lib/brand/brand-data";
 import { isBrandFilePreviewable } from "@/lib/brand/brand-files";
 import { prisma } from "@/lib/prisma";
+import { getR2PublicBaseUrl } from "@/lib/r2";
 
 import { toolEntitlement, type ToolEntitlement } from "./entitlement";
 
 export type ToolAccessFacts = {
   entitlement: ToolEntitlement;
   userId: string | null;
+  /** The signed-in user's own address; a test newsletter is sent only there. */
+  userEmail: string | null;
   /** The signed-in user's active company; null when signed out or without one. */
   companyId: string | null;
   brandColors: { hex: string; name: string | null }[];
@@ -30,6 +33,7 @@ export async function getToolAccess(): Promise<ToolAccessFacts> {
     return {
       entitlement: toolEntitlement({ signedIn: false, plan: null }),
       userId: null,
+      userEmail: null,
       companyId: null,
       brandColors: [],
       companyName: null,
@@ -66,6 +70,7 @@ export async function getToolAccess(): Promise<ToolAccessFacts> {
   return {
     entitlement: toolEntitlement({ signedIn: true, plan: company?.plan ?? null }),
     userId: user.id,
+    userEmail: user.email ?? null,
     companyId: company?.id ?? null,
     brandColors: readBrandColors(company?.brands[0]?.colors).map((color) => ({
       hex: color.hex,
@@ -76,6 +81,19 @@ export async function getToolAccess(): Promise<ToolAccessFacts> {
       isBrandFilePreviewable(asset.name),
     ),
   };
+}
+
+/** The newsletter builder's "Write with AI" needs a plan and the text model's key. */
+export function newsletterAiAvailable(entitlement: ToolEntitlement): boolean {
+  return entitlement.pro && Boolean(process.env.ANTHROPIC_API_KEY);
+}
+
+/**
+ * Uploading a picture for a newsletter needs a plan and the public asset
+ * domain: an email can only show a picture from an address that never expires.
+ */
+export function newsletterUploadAvailable(entitlement: ToolEntitlement): boolean {
+  return entitlement.pro && getR2PublicBaseUrl() !== null && Boolean(process.env.R2_BUCKET);
 }
 
 /** "Extend with AI" needs a plan and the image model's key on this deployment. */

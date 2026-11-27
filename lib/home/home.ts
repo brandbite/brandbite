@@ -128,7 +128,7 @@ export function customerReminders({
   }
 
   const waiting = open.filter((t) => t.status !== "IN_REVIEW");
-  for (const t of waiting.filter((t) => isDueDateOverdue(t.dueDate)).sort(byDue)) {
+  for (const t of waiting.filter((t) => isDueDateOverdue(t.dueDate, now.getTime())).sort(byDue)) {
     reminders.push({
       key: `overdue-${t.id}`,
       kind: "overdue",
@@ -156,7 +156,7 @@ export function customerReminders({
     }
   }
 
-  for (const t of waiting.filter((t) => isDueDateSoon(t.dueDate)).sort(byDue)) {
+  for (const t of waiting.filter((t) => isDueDateSoon(t.dueDate, now.getTime())).sort(byDue)) {
     reminders.push({
       key: `due-${t.id}`,
       kind: "dueSoon",

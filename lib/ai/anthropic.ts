@@ -190,3 +190,35 @@ export async function writeCopyOptions(
     model: response.model,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Newsletter draft (structured)
+// ---------------------------------------------------------------------------
+
+const NewsletterDraftSchema = z.object({
+  subject: z.string(),
+  preheader: z.string(),
+  headline: z.string(),
+  intro: z.string(),
+  sections: z.array(z.object({ title: z.string(), text: z.string() })),
+  buttonLabel: z.string(),
+});
+
+/**
+ * The words of one newsletter. The caller writes both prompts and tidies the
+ * result (lib/newsletter/ai.ts).
+ */
+export async function writeNewsletterDraft(
+  systemPrompt: string,
+  prompt: string,
+): Promise<{ draft: z.infer<typeof NewsletterDraftSchema>; usage: TextUsage; model: string }> {
+  const response = await getAnthropicClient().beta.messages.parse({
+    ...baseParams(prompt, systemPrompt),
+    output_config: { effort: "low", format: betaZodOutputFormat(NewsletterDraftSchema) },
+  });
+  if (response.stop_reason === "refusal") throw new AiRefusalError();
+  if (!response.parsed_output) {
+    throw new Error("The newsletter came back in a shape we couldn't read.");
+  }
+  return { draft: response.parsed_output, usage: usageOf(response.usage), model: response.model };
+}

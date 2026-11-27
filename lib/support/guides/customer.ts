@@ -1337,8 +1337,8 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
             type: "list",
             items: [
               {
-                term: "Background",
-                text: "when you are signed in, the colors from your **Brand guide** are offered first, above the presets. **Transparent** downloads the device with nothing behind it.",
+                term: "Scene",
+                text: "the background behind the device. When you are signed in, the colors from your **Brand guide** are offered first, above the presets. **Transparent** downloads the device with nothing behind it.",
               },
               {
                 term: "Download PNG · 1080p",
@@ -1372,7 +1372,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
             items: [
               {
                 term: "Social resizer",
-                text: "choose one image, switch on the platforms you post to and tick the sizes. **Crop to fill** cuts the edges: press **Adjust** on a size to drag the image and zoom until the frame holds the part you want, and **Use for every size** to keep that position everywhere. **Fit inside** keeps the whole image and fills the rest with a color. Download one size from its card, or all of them as a zip. Click a size's picture to see it large. On a brandbite plan, **Resize with AI** on a size has the AI lay your design out again for that shape instead of cutting it. The AI redraws the picture, so read the text and look at faces and logos before you post it; **Compare** shows the cropped version, **Undo** goes back to it. Your company gets 10 AI resizes in any 24 hours; they use no tokens. A resize that fails still counts.",
+                text: "choose one image, switch on the platforms you post to and tick the sizes. **Crop to fill** cuts the edges: press **Adjust crop** on a size to drag the image and zoom until the frame holds the part you want, and **Use for every size** to keep that position everywhere. **Fit inside** keeps the whole image and fills the rest with a color. Download one size from its card, or all of them as a zip. Click a size's picture to see it large. On a brandbite plan, **Resize with AI** on a size has the AI lay your design out again for that shape instead of cutting it. The AI redraws the picture, so read the text and look at faces and logos before you post it; **Compare** shows the cropped version, **Undo** goes back to it. Your company gets 10 AI resizes in any 24 hours; they use no tokens. A resize that fails still counts.",
               },
               {
                 term: "Image converter",
@@ -1425,18 +1425,22 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         ],
       },
       {
-        heading: "Logo pack, Email signature and Post and ad preview",
+        heading: "Logo pack, Email signature, Newsletter builder and Post and ad preview",
         blocks: [
           {
             type: "list",
             items: [
               {
                 term: "Logo pack",
-                text: "choose your logo (an SVG is best), or **Use the logo from my brand guide** when your brand guide has one, and pick a background color for the icons. **Download PNG** gives one 512 pixel PNG. **Download the full pack**, available while your company is on a brandbite plan, is a zip with the logo in its own colors, black and white at three sizes, a favicon set, an app icon, a profile image and a note on what each file is for. **See it in use** shows the logo on a business card, a phone home screen and a browser tab; **On a phone**, **On a laptop** and **On a tablet** open it on a 3D device in Mockup Studio.",
+                text: "choose your logo (an SVG is best), or **Use the logo from my brand guide** when your brand guide has one, and pick a background color for the icons. **Download PNG** gives one 512 pixel PNG. **Full pack (ZIP)**, available while your company is on a brandbite plan, is a zip with the logo in its own colors, black and white at three sizes, a favicon set, an app icon, a profile image and a note on what each file is for. **Applications** shows the logo in a browser tab, as an app icon and as a profile image; under **On a 3D device**, **Phone**, **Laptop** and **Tablet** open it in Mockup Studio.",
               },
               {
                 term: "Email signature",
                 text: "pick one of six templates, fill in your details and adjust the accent color, text size and font. You can add an extra line and LinkedIn, Instagram and X links. Your company name and first brand color are filled in for you. **Copy signature** copies it ready to paste into your mail app; **Copy HTML** and **Download HTML** give the code. A logo shows only from a web address, so paste the https address of your logo on your own website: a PNG or JPG under 2 MB (mail apps don't show SVG). The preview tells you if the address can't be loaded. Nothing you type is saved.",
+              },
+              {
+                term: "Newsletter builder",
+                text: "builds an email newsletter you send with your own email service; brandbite doesn't send it to your list. The first page shows **Your newsletters** and the templates; search them, press **Preview** to see one at full size, then **Use template**, or **Start from scratch**, to open the editor. The editor has three steps at the top, **Build**, **Review** and **Export**, and you can move between them in any order. In **Build**, drag a block from the list on the left into the newsletter, or click it to add it under the block you picked. Click any block, the header or the footer and the **Block** tab on the right shows its settings: its words, links and images under **Content**, and its alignment, spacing and background under **Layout**. A button has **Button look**: **Filled** or **Outline**, its color, its text color, its size and its **Rounded corners**; the buttons inside **Product** and **Video** have the same settings. **Product**, **Quote**, **Event** and **Story** have **Colors** for their accent and their text. A heading has **Text size**, an image **Rounded corners**, a divider its **Thickness** and kind of line, and the social icons an **Icon size**. A setting you haven't touched follows the **Style** tab, so it changes with the whole email. The small bar on a picked block moves it up or down, and has **Duplicate**, **Save** and **Delete**; you can also drag a block to a new place. **Columns** puts blocks side by side, and **Story**, **Product**, **Quote**, **Event**, **Video** and **Social** are ready-made blocks. The **Email** tab holds the **Inbox preview**, the **Subject line**, **Preview text** and **Write with AI**, and the **Style** tab sets the look, colors, fonts and button shape for the whole newsletter. You can also type straight on the newsletter: click a block, then click its words. On a text block a small bar under it formats the selected words: bold, italic, underline, a link, a bulleted or a numbered list. An email shows a picture only from a web address: press **Upload an image**, or paste an https address. **Write with AI** writes a whole issue from your description in your brand's voice; on a heading or text block, **Rewrite with AI** improves, shortens or changes the tone, and **Suggest subject lines** offers three. To greet each reader by name, add a personal field (first name, last name or email) from the bar under a text block, or copy it under **Personal fields**; when you export it becomes the tag your email service fills in, and the preview shows an example. Under **Layout** a block can get a background picture or be drawn as a box with a border and rounded corners, and under **Screens** it can be shown everywhere, not on phones, or on phones only; columns can stay side by side on phones. Press **Save** on a picked block to keep it under the **Saved** tab of the block list for your other newsletters. **Desktop** and **Mobile** above the newsletter show it at a computer's or a phone's width; you change it in Desktop. **History** at the top lists earlier versions of a saved newsletter, kept about every ten minutes while you work; **Bring back** returns to one, and Undo returns to what you had. When you upload a picture you can cut it to a shape first, and **Your pictures** shows what your company uploaded before. These share 10 runs a day for your company, a run that fails is not counted, and they use only the facts you give them, so check the result. **Undo** and **Redo** are at the top (Ctrl+Z, Ctrl+Shift+Z). **Review** shows the email as a computer and a phone show it, beside the list of what is still missing before you send; press **Fix it** on an item to go to it in Build. The button at the top that counts what is left to fix opens Review as well. **Export** asks which service will send it, so the unsubscribe link and personal fields are written as that service's tags, and gives **Copy HTML**, **Download HTML** and **Copy plain text** to paste into your email service as custom HTML. **Send test** emails the newsletter to your own address only. Your work is saved to your account as you go, for everyone in your company. On the first page you can **Duplicate** a newsletter, **Keep as template** to reuse it, or **Delete** it. Columns, the ready-made blocks, AI writing, image upload, saved newsletters and test emails are included while your company is on a brandbite plan; without one, the editor works with the basic blocks and keeps one draft in your browser.",
               },
               {
                 term: "Post and ad preview",
@@ -1451,7 +1455,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "**Color Studio**, **Gradient generator**, **Mockup Studio**, **Social resizer**, **Image converter**, **QR code**, **Type scale**, **Logo pack**, **Email signature**, **Post and ad preview**, **Brand kit**, **Brand playlist**, **Size guide**, **Templates**, **Brief generator** and **Cost calculator** open on our public site, so the sidebar is not there. Use your browser's back button to return to the dashboard.",
+            text: "**Color Studio**, **Gradient generator**, **Mockup Studio**, **Social resizer**, **Image converter**, **QR code**, **Type scale**, **Logo pack**, **Email signature**, **Newsletter builder**, **Post and ad preview**, **Brand kit**, **Brand playlist**, **Size guide**, **Templates**, **Brief generator** and **Cost calculator** open on our public site, so the sidebar is not there. Use your browser's back button to return to the dashboard.",
           },
         ],
       },

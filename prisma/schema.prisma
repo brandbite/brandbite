@@ -330,7 +330,10 @@ model UserAccount {
   createdMoodboardItems MoodboardItem[]    @relation("MoodboardItemCreatedBy")
 
   // Color tools
-  savedPalettes SavedPalette[] @relation("SavedPaletteCreatedBy")
+  savedPalettes         SavedPalette[]         @relation("SavedPaletteCreatedBy")
+  newsletters           Newsletter[]           @relation("NewsletterCreatedBy")
+  newsletterVersions    NewsletterVersion[]    @relation("NewsletterVersionCreatedBy")
+  newsletterSavedBlocks NewsletterSavedBlock[] @relation("NewsletterSavedBlockCreatedBy")
 
   // Creative ratings (admin-only signal; creative does NOT see their own ratings)
   receivedRatings  CreativeRating[] @relation("CreativeRatingsReceived")
@@ -443,7 +446,10 @@ model Company {
 
   aiGenerations AiGeneration[]
 
-  moodboards Moodboard[]
+  moodboards            Moodboard[]
+  /// Newsletters built in the newsletter builder (/newsletter-builder).
+  newsletters           Newsletter[]
+  newsletterSavedBlocks NewsletterSavedBlock[]
 
   /// Brand guides. One is the default; a project can point at another.
   brands Brand[]
@@ -2162,6 +2168,74 @@ model SavedPalette {
   updatedAt DateTime @updatedAt
 
   @@index([createdById, createdAt])
+}
+
+// A newsletter built in the newsletter builder (/newsletter-builder) and kept
+// for a company on a plan; everyone in the company sees it. brandbite never
+// sends it: the customer copies its HTML into their own email service.
+model Newsletter {
+  id   String @id @default(cuid())
+  name String
+
+  /// The builder's document: theme, header, blocks, footer. Read back through
+  /// readNewsletter (lib/newsletter/newsletter.ts), which drops anything unexpected.
+  data Json
+
+  /// Kept as a starting point: shown under "Your templates" and copied when used.
+  isTemplate Boolean @default(false)
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  createdById String?
+  createdBy   UserAccount? @relation("NewsletterCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  versions NewsletterVersion[]
+
+  @@index([companyId, updatedAt])
+}
+
+// An earlier state of a kept newsletter, so a customer can go back to it. One
+// is written when a newsletter is saved and the last one is older than a few
+// minutes; only the newest ones are kept (lib/newsletter/store.server.ts).
+model NewsletterVersion {
+  id String @id @default(cuid())
+
+  newsletterId String
+  newsletter   Newsletter @relation(fields: [newsletterId], references: [id], onDelete: Cascade)
+
+  /// The builder's document as it was; read back through readNewsletter.
+  data Json
+
+  createdById String?
+  createdBy   UserAccount? @relation("NewsletterVersionCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([newsletterId, createdAt])
+}
+
+// One block a company keeps from the newsletter builder to use again in other
+// newsletters (a footer note, a product card, a set of columns).
+model NewsletterSavedBlock {
+  id   String @id @default(cuid())
+  name String
+
+  /// The block as the builder holds it; read back through readNewsletter.
+  data Json
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  createdById String?
+  createdBy   UserAccount? @relation("NewsletterSavedBlockCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([companyId, createdAt])
 }
 
 // Read-only snapshot behind a public /colors/p/[id] link. Holds only what the

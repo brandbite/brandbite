@@ -201,19 +201,19 @@ export const formatDueDateShort = (iso: string | null): string | null => {
 };
 
 /** Check if a due date is in the past */
-export const isDueDateOverdue = (iso: string | null): boolean => {
+export const isDueDateOverdue = (iso: string | null, now: number = Date.now()): boolean => {
   if (!iso) return false;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return false;
-  return d.getTime() < Date.now();
+  return d.getTime() < now;
 };
 
 /** Check if due date is within 3 days (soon, but not overdue) */
-export const isDueDateSoon = (iso: string | null): boolean => {
+export const isDueDateSoon = (iso: string | null, now: number = Date.now()): boolean => {
   if (!iso) return false;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return false;
-  const diffMs = d.getTime() - Date.now();
+  const diffMs = d.getTime() - now;
   const diffDays = diffMs / (1000 * 60 * 60 * 24);
   return diffDays > 0 && diffDays <= 3;
 };

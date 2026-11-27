@@ -78,6 +78,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     entry("/", 1),
     ...MARKETING_PATHS.map((path) => entry(path, 0.8)),
     ...COLOR_TOOL_PATHS.map((path) => entry(path, 0.8)),
+    entry("/tools", 0.8),
     entry("/sizes", 0.8),
     entry("/templates", 0.8),
     ...TEMPLATES.map((template) =>
@@ -91,6 +92,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     entry("/type-scale", 0.8),
     entry("/logo-pack", 0.8),
     entry("/email-signature", 0.8),
+    entry("/newsletter-builder", 0.8),
     entry("/post-preview", 0.8),
     entry("/brand-kit", 0.8),
     entry("/design-cost-calculator", 0.8),

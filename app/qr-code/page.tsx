@@ -1,15 +1,18 @@
 // -----------------------------------------------------------------------------
 // @file: app/qr-code/page.tsx
-// @purpose: Branded QR code generator. The tool is client-side; the guide
-//           below it is in the first HTML for search engines and readers.
+// @purpose: Branded QR code generator. The tool is client-side; the steps and
+//           questions below it are in the first HTML for search engines and
+//           readers.
 // -----------------------------------------------------------------------------
 
 import type { Metadata } from "next";
-import Link from "next/link";
+import Image from "next/image";
 
 import { StudioShell } from "@/components/colors/studio/studio-shell";
 import { QrCodeGenerator } from "@/components/qr/qr-code-generator";
 import { JsonLd } from "@/components/seo/json-ld";
+import { SwitchTool } from "@/components/tools/switch-tool";
+import { ToolFaq, ToolNote, ToolSteps, type ToolFaqItem } from "@/components/tools/tool-page";
 import { pageMetadata } from "@/lib/seo/metadata";
 import { breadcrumbJsonLd, webApplicationJsonLd } from "@/lib/seo/structured-data";
 
@@ -26,6 +29,27 @@ export const metadata: Metadata = pageMetadata({
   path: TOOL.path,
 });
 
+const STRIP = [
+  {
+    title: "Add a link or text",
+    text: "Enter a web address or any text you want to share.",
+    // A pencil.
+    icon: "M4 20l4-1 11-11-3-3L5 16zM14 7l3 3",
+  },
+  {
+    title: "Customize your code",
+    text: "Choose the shape and colors, and add your logo.",
+    // Three sliders.
+    icon: "M4 6h16M4 12h16M4 18h16M14 4v4M8 10v4M16 16v4",
+  },
+  {
+    title: "Export and test",
+    text: "Download your QR code and test it on your phone.",
+    // An arrow down into a tray.
+    icon: "M12 4v11M7 10l5 5 5-5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4",
+  },
+];
+
 const TIPS = [
   "Keep the code dark and the background light. Phone cameras read that fastest.",
   "Leave the empty margin around the code. Without it, scanners can't find the corners.",
@@ -35,11 +59,21 @@ const TIPS = [
   "Use the SVG for print. It stays sharp on a business card and on a billboard.",
 ];
 
-const FAQ = [
+const FAQ: ToolFaqItem[] = [
   {
-    question: "Does the QR code expire?",
+    question: "Will my code expire?",
     answer:
       "No. The link is stored in the picture itself, not on our servers, so the code keeps working for as long as the link it points to does.",
+  },
+  {
+    question: "Which format should I download?",
+    answer:
+      "Use the SVG for print: it stays sharp at any size, from a business card to a billboard. Use a PNG for screens and documents; 1024px is enough for most, and 2048px is there when you need it larger.",
+  },
+  {
+    question: "Can I add my logo?",
+    answer:
+      "Yes. Add a PNG, JPG, WebP or SVG of up to 2 MB and it sits in the middle of the code. The code is then made with the highest level of error correction, which lets it be read with part of it covered. Keep the colors high-contrast and test it before printing.",
   },
   {
     question: "Are scans tracked?",
@@ -52,23 +86,38 @@ const FAQ = [
       "Not in the code itself. To keep that option, point the code at a page on your own site that you can redirect later.",
   },
   {
-    question: "Will it still scan with a logo on it?",
-    answer:
-      "Yes. When you add a logo, the code is made with the highest level of error correction, which lets it be read with part of it covered. Keep the colors high-contrast and test it before printing.",
+    question: "How do I make a QR code that always scans?",
+    answer: (
+      <ul className="flex list-disc flex-col gap-2 pl-5">
+        {TIPS.map((tip) => (
+          <li key={tip}>{tip}</li>
+        ))}
+      </ul>
+    ),
   },
 ];
 
 export default function QrCodePage() {
   return (
     <StudioShell
-      label="QR CODE"
+      label="FREE TOOLS"
       nav={null}
-      title="QR codes"
-      accent="in your brand colors."
-      blurb="Type a link, pick your colors, add your logo. Download it sharp at any size."
-      ctaHeading="A code that fits."
-      ctaHeadingAccent="A design that sells."
-      ctaBlurb="Need the flyer, menu or packaging the code goes on? Send a request to brandbite."
+      title="QR code."
+      accent="A clear connection."
+      accentBelow
+      blurb="Turn a link or text into a custom QR code for your brand."
+      action={<SwitchTool current="qr-code" />}
+      aside={
+        <Image
+          src="/tools/qr-code-hero.webp"
+          alt=""
+          width={600}
+          height={640}
+          priority
+          className="-my-4 h-[250px] w-auto max-[1023px]:h-[200px]"
+        />
+      }
+      closing="ready"
     >
       <JsonLd
         data={[
@@ -77,49 +126,16 @@ export default function QrCodePage() {
         ]}
       />
 
+      <ToolNote
+        title="Static codes. No tracking or expiry."
+        text="The code is made in your browser; nothing is sent to us."
+      />
+
       <QrCodeGenerator />
 
-      <section
-        aria-labelledby="qr-tips-heading"
-        className="mt-6 rounded-2xl border border-[var(--cs-border)] bg-[var(--cs-surface)] p-8 max-[767px]:p-5"
-      >
-        <h2 id="qr-tips-heading" className="text-2xl leading-8 font-semibold">
-          Tips for a QR code that always scans
-        </h2>
-        <ul className="mt-4 flex max-w-[760px] list-disc flex-col gap-2 pl-5 text-base leading-7">
-          {TIPS.map((tip) => (
-            <li key={tip}>{tip}</li>
-          ))}
-        </ul>
+      <ToolSteps steps={STRIP} labelId="qr-steps-heading" />
 
-        <h2 className="mt-8 text-2xl leading-8 font-semibold">Questions</h2>
-        <dl className="mt-4 grid grid-cols-2 gap-x-8 gap-y-5 max-[767px]:grid-cols-1">
-          {FAQ.map((item) => (
-            <div key={item.question}>
-              <dt className="text-base leading-6 font-semibold">{item.question}</dt>
-              <dd className="mt-1 text-base leading-6 text-[var(--cs-muted)]">{item.answer}</dd>
-            </div>
-          ))}
-        </dl>
-
-        <h2 className="mt-8 text-2xl leading-8 font-semibold">Related free tools</h2>
-        <ul className="mt-3 flex flex-wrap gap-2">
-          {[
-            { href: "/colors/contrast-checker", label: "Contrast checker" },
-            { href: "/colors/color-palette-generator", label: "Color palette generator" },
-            { href: "/mockups", label: "Mockup Studio" },
-          ].map((link) => (
-            <li key={link.href}>
-              <Link
-                href={link.href}
-                className="flex h-11 items-center rounded-full border border-[var(--cs-border)] bg-[var(--cs-surface)] px-4 text-sm font-medium hover:border-[var(--cs-text)]"
-              >
-                {link.label}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </section>
+      <ToolFaq items={FAQ} labelId="qr-faq-heading" />
     </StudioShell>
   );
 }

@@ -1,15 +1,18 @@
 // -----------------------------------------------------------------------------
 // @file: app/logo-pack/page.tsx
-// @purpose: Logo pack generator. The tool is client-side; the guide below it
-//           is in the first HTML for search engines and readers.
+// @purpose: Logo pack generator. The tool is client-side; the steps and
+//           questions below it are in the first HTML for search engines and
+//           readers.
 // -----------------------------------------------------------------------------
 
 import type { Metadata } from "next";
-import Link from "next/link";
+import Image from "next/image";
 
 import { StudioShell } from "@/components/colors/studio/studio-shell";
 import { LogoPack } from "@/components/logo-pack/logo-pack";
 import { JsonLd } from "@/components/seo/json-ld";
+import { SwitchTool } from "@/components/tools/switch-tool";
+import { ToolFaq, ToolNote, ToolSteps, type ToolFaqItem } from "@/components/tools/tool-page";
 import { pageMetadata } from "@/lib/seo/metadata";
 import { breadcrumbJsonLd, webApplicationJsonLd } from "@/lib/seo/structured-data";
 
@@ -25,6 +28,27 @@ export const metadata: Metadata = pageMetadata({
   description: TOOL.description,
   path: TOOL.path,
 });
+
+const STRIP = [
+  {
+    title: "Upload your logo",
+    text: "Add an SVG or a transparent PNG of your brand mark.",
+    // An arrow up out of a tray.
+    icon: "M12 15V4M7 9l5-5 5 5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4",
+  },
+  {
+    title: "Review the variants",
+    text: "See the color versions, sizes and key formats.",
+    // Three stacked sheets.
+    icon: "M12 3l9 5-9 5-9-5zM3 12l9 5 9-5M3 16l9 5 9-5",
+  },
+  {
+    title: "Download your pack",
+    text: "Get a PNG for free, or the full pack with a plan.",
+    // An arrow down into a tray.
+    icon: "M12 4v11M7 10l5 5 5-5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4",
+  },
+];
 
 const FILES = [
   {
@@ -52,17 +76,65 @@ const TIPS = [
   "The black and white versions are solid shapes. If your logo depends on several colors to be readable, check them before you use them.",
 ];
 
+const FAQ: ToolFaqItem[] = [
+  {
+    question: "Which logo files can I upload?",
+    answer:
+      "An SVG, PNG, WebP or JPG of up to 10 MB. An SVG is best because it stays sharp at every size. A PNG with a see-through background works too. Your logo is drawn in your browser and is not uploaded.",
+  },
+  {
+    question: "What is free?",
+    answer:
+      "One 512 pixel PNG of your logo in its own colors is free, with no sign-up. The full pack, with every version and size in one zip, is included with every brandbite plan.",
+  },
+  {
+    question: "What is inside the full pack?",
+    answer: (
+      <>
+        <ul className="flex list-disc flex-col gap-2 pl-5">
+          {FILES.map((item) => (
+            <li key={item.title}>
+              <span className="font-semibold text-[var(--cs-text)]">{item.title}.</span> {item.body}
+            </li>
+          ))}
+        </ul>
+        <p className="mt-3">A short note in the zip explains what each file is for.</p>
+      </>
+    ),
+  },
+  {
+    question: "How do I get a clean pack?",
+    answer: (
+      <ul className="flex list-disc flex-col gap-2 pl-5">
+        {TIPS.map((tip) => (
+          <li key={tip}>{tip}</li>
+        ))}
+      </ul>
+    ),
+  },
+];
+
 export default function LogoPackPage() {
   return (
     <StudioShell
-      label="LOGO PACK"
+      label="FREE TOOLS"
       nav={null}
-      title="One logo,"
-      accent="every file you need."
-      blurb="Color, black and white versions, a favicon set and a profile image, in one zip."
-      ctaHeading="Have the files."
-      ctaHeadingAccent="Need the logo?"
-      ctaBlurb="Send a logo or brand identity request to brandbite and get it back with every file, on one simple subscription."
+      title="Logo pack."
+      accent="Ready for everywhere."
+      accentBelow
+      blurb="Turn one logo into a complete pack: color versions, sizes and formats in seconds."
+      action={<SwitchTool current="logo-pack" />}
+      aside={
+        <Image
+          src="/tools/logo-pack-hero.webp"
+          alt=""
+          width={743}
+          height={640}
+          priority
+          className="-my-4 h-[250px] w-auto max-[1023px]:h-[200px]"
+        />
+      }
+      closing="ready"
     >
       <JsonLd
         data={[
@@ -71,55 +143,16 @@ export default function LogoPackPage() {
         ]}
       />
 
+      <ToolNote
+        title="Upload an SVG or transparent PNG for clean results."
+        text="Your logo stays in your browser."
+      />
+
       <LogoPack />
 
-      <section
-        aria-labelledby="logo-pack-what-heading"
-        className="mt-6 rounded-2xl border border-[var(--cs-border)] bg-[var(--cs-surface)] p-8 max-[767px]:p-5"
-      >
-        <h2 id="logo-pack-what-heading" className="text-2xl leading-8 font-semibold">
-          What is in a logo pack?
-        </h2>
-        <ul className="mt-4 grid grid-cols-2 gap-x-8 gap-y-5 max-[767px]:grid-cols-1">
-          {FILES.map((item) => (
-            <li key={item.title}>
-              <h3 className="text-base leading-6 font-semibold">{item.title}</h3>
-              <p className="mt-1 text-base leading-6 text-[var(--cs-muted)]">{item.body}</p>
-            </li>
-          ))}
-        </ul>
+      <ToolSteps steps={STRIP} labelId="logo-pack-steps-heading" />
 
-        <h2 className="mt-8 text-2xl leading-8 font-semibold">Free and Pro</h2>
-        <p className="mt-3 max-w-[760px] text-base leading-7">
-          One 512 pixel PNG of your logo is free. The full pack, with every version and size in one
-          zip, is included with every brandbite plan.
-        </p>
-
-        <h2 className="mt-8 text-2xl leading-8 font-semibold">Tips for a clean pack</h2>
-        <ul className="mt-4 flex max-w-[760px] list-disc flex-col gap-2 pl-5 text-base leading-7">
-          {TIPS.map((tip) => (
-            <li key={tip}>{tip}</li>
-          ))}
-        </ul>
-
-        <h2 className="mt-8 text-2xl leading-8 font-semibold">Related free tools</h2>
-        <ul className="mt-3 flex flex-wrap gap-2">
-          {[
-            { href: "/brand-kit", label: "Brand kit generator" },
-            { href: "/qr-code", label: "QR code generator" },
-            { href: "/email-signature", label: "Email signature generator" },
-          ].map((link) => (
-            <li key={link.href}>
-              <Link
-                href={link.href}
-                className="flex h-11 items-center rounded-full border border-[var(--cs-border)] bg-[var(--cs-surface)] px-4 text-sm font-medium hover:border-[var(--cs-text)]"
-              >
-                {link.label}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </section>
+      <ToolFaq items={FAQ} labelId="logo-pack-faq-heading" />
     </StudioShell>
   );
 }
