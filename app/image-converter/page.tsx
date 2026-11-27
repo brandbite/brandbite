@@ -1,16 +1,18 @@
 // -----------------------------------------------------------------------------
 // @file: app/image-converter/page.tsx
 // @purpose: Image converter and compressor (PNG, JPG, WebP). The tool is
-//           client-side; the guide below it is in the first HTML for search
-//           engines and readers.
+//           client-side; the steps and questions below it are in the first
+//           HTML for search engines and readers.
 // -----------------------------------------------------------------------------
 
 import type { Metadata } from "next";
-import Link from "next/link";
+import Image from "next/image";
 
 import { StudioShell } from "@/components/colors/studio/studio-shell";
 import { ImageConverter } from "@/components/image-tools/image-converter";
 import { JsonLd } from "@/components/seo/json-ld";
+import { SwitchTool } from "@/components/tools/switch-tool";
+import { ToolFaq, ToolNote, ToolSteps, type ToolFaqItem } from "@/components/tools/tool-page";
 import { pageMetadata } from "@/lib/seo/metadata";
 import { breadcrumbJsonLd, webApplicationJsonLd } from "@/lib/seo/structured-data";
 
@@ -26,6 +28,27 @@ export const metadata: Metadata = pageMetadata({
   description: TOOL.description,
   path: TOOL.path,
 });
+
+const STEPS = [
+  {
+    title: "Add your images",
+    text: "Choose JPG, PNG or WebP files.",
+    // An arrow up out of a tray.
+    icon: "M12 15V4M7 9l5-5 5 5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4",
+  },
+  {
+    title: "Set your options",
+    text: "Choose format, quality and maximum width.",
+    // Three sliders.
+    icon: "M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1M15 4v4M9 10v4M17 16v4",
+  },
+  {
+    title: "Convert and download",
+    text: "Get files individually or in one ZIP.",
+    // An arrow down into a tray.
+    icon: "M12 4v11M7 10l5 5 5-5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4",
+  },
+];
 
 const FORMATS = [
   {
@@ -50,17 +73,68 @@ const TIPS = [
   "A PNG converted to PNG won't shrink. To make it smaller, change the format or the width.",
 ];
 
+const FAQ: ToolFaqItem[] = [
+  {
+    question: "Which image formats are supported?",
+    answer:
+      "PNG, JPG and WebP, both to convert from and to convert to. You can add up to 30 images at a time, each up to 25 MB.",
+  },
+  {
+    question: "Will this upscale small images?",
+    answer:
+      "No. The maximum width only makes wider images smaller. An image that is already narrower keeps its size, and every image keeps its proportions.",
+  },
+  {
+    question: "Are my images uploaded to a server?",
+    answer:
+      "No. Your images are read and converted by your own browser, on your device. They are not uploaded to brandbite or anywhere else, which is also why converting is quick.",
+  },
+  {
+    question: "Which format should I choose?",
+    answer: (
+      <dl className="flex flex-col gap-3">
+        {FORMATS.map((format) => (
+          <div key={format.title}>
+            <dt className="font-semibold text-[var(--cs-text)]">{format.title}</dt>
+            <dd>{format.body}</dd>
+          </div>
+        ))}
+      </dl>
+    ),
+  },
+  {
+    question: "How do I get smaller files?",
+    answer: (
+      <ul className="flex list-disc flex-col gap-2 pl-5">
+        {TIPS.map((tip) => (
+          <li key={tip}>{tip}</li>
+        ))}
+      </ul>
+    ),
+  },
+];
+
 export default function ImageConverterPage() {
   return (
     <StudioShell
-      label="IMAGE CONVERTER"
+      label="FREE TOOLS"
       nav={null}
-      title="Convert and compress"
-      accent="images."
-      blurb="PNG, JPG and WebP, at the quality and width you choose. Nothing leaves your browser."
-      ctaHeading="Smaller files."
-      ctaHeadingAccent="Same great design."
-      ctaBlurb="Need the images themselves designed? Send a request to brandbite and get them back ready to use."
+      title="Image converter."
+      accent="Ready to go."
+      accentBelow
+      blurb="Convert JPG, PNG and WebP in your browser."
+      action={<SwitchTool current="image-converter" />}
+      aside={
+        <Image
+          src="/tools/image-converter-hero.webp"
+          alt=""
+          width={683}
+          height={640}
+          priority
+          className="-my-4 h-[250px] w-auto max-[1023px]:h-[200px]"
+        />
+      }
+      closing="ready"
     >
       <JsonLd
         data={[
@@ -69,55 +143,16 @@ export default function ImageConverterPage() {
         ]}
       />
 
+      <ToolNote
+        title="Your images stay in your browser."
+        text="We don't upload or store your files on our servers."
+      />
+
       <ImageConverter />
 
-      <section
-        aria-labelledby="converter-formats-heading"
-        className="mt-6 rounded-2xl border border-[var(--cs-border)] bg-[var(--cs-surface)] p-8 max-[767px]:p-5"
-      >
-        <h2 id="converter-formats-heading" className="text-2xl leading-8 font-semibold">
-          Which format should you choose?
-        </h2>
-        <ul className="mt-4 grid grid-cols-3 gap-x-8 gap-y-5 max-[767px]:grid-cols-1">
-          {FORMATS.map((format) => (
-            <li key={format.title}>
-              <h3 className="text-base leading-6 font-semibold">{format.title}</h3>
-              <p className="mt-1 text-base leading-6 text-[var(--cs-muted)]">{format.body}</p>
-            </li>
-          ))}
-        </ul>
+      <ToolSteps steps={STEPS} labelId="converter-steps-heading" />
 
-        <h2 className="mt-8 text-2xl leading-8 font-semibold">Is it private?</h2>
-        <p className="mt-3 max-w-[760px] text-base leading-7">
-          Yes. Your images are read and converted by your own browser, on your device. They are not
-          uploaded to brandbite or anywhere else, which is also why converting is quick.
-        </p>
-
-        <h2 className="mt-8 text-2xl leading-8 font-semibold">Tips for smaller images</h2>
-        <ul className="mt-4 flex max-w-[760px] list-disc flex-col gap-2 pl-5 text-base leading-7">
-          {TIPS.map((tip) => (
-            <li key={tip}>{tip}</li>
-          ))}
-        </ul>
-
-        <h2 className="mt-8 text-2xl leading-8 font-semibold">Related free tools</h2>
-        <ul className="mt-3 flex flex-wrap gap-2">
-          {[
-            { href: "/social-resizer", label: "Social media resizer" },
-            { href: "/sizes", label: "Social media size guide" },
-            { href: "/mockups", label: "Mockup Studio" },
-          ].map((link) => (
-            <li key={link.href}>
-              <Link
-                href={link.href}
-                className="flex h-11 items-center rounded-full border border-[var(--cs-border)] bg-[var(--cs-surface)] px-4 text-sm font-medium hover:border-[var(--cs-text)]"
-              >
-                {link.label}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </section>
+      <ToolFaq items={FAQ} labelId="converter-faq-heading" />
     </StudioShell>
   );
 }

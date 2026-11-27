@@ -1,16 +1,19 @@
 // -----------------------------------------------------------------------------
 // @file: app/social-resizer/page.tsx
 // @purpose: Social resizer: one image cropped to every social media size.
-//           The tool is client-side; the guide below it is in the first HTML
-//           for search engines and readers.
+//           The tool is client-side; the steps and questions below it are in
+//           the first HTML for search engines and readers.
 // -----------------------------------------------------------------------------
 
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 
 import { StudioShell } from "@/components/colors/studio/studio-shell";
 import { SocialResizer } from "@/components/image-tools/social-resizer";
 import { JsonLd } from "@/components/seo/json-ld";
+import { SwitchTool } from "@/components/tools/switch-tool";
+import { ToolFaq, ToolNote, ToolSteps, type ToolFaqItem } from "@/components/tools/tool-page";
 import { pageMetadata } from "@/lib/seo/metadata";
 import { breadcrumbJsonLd, webApplicationJsonLd } from "@/lib/seo/structured-data";
 
@@ -27,10 +30,31 @@ export const metadata: Metadata = pageMetadata({
   path: TOOL.path,
 });
 
-const STEPS = [
+const STRIP = [
+  {
+    title: "Upload an image",
+    text: "Add your picture as a JPG, PNG or WebP.",
+    // An arrow up out of a tray.
+    icon: "M12 15V4M7 9l5-5 5 5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4",
+  },
+  {
+    title: "Choose formats",
+    text: "Pick the platforms and the sizes you need.",
+    // Three stacked sheets.
+    icon: "M12 3l9 5-9 5-9-5zM3 12l9 5 9-5M3 16l9 5 9-5",
+  },
+  {
+    title: "Adjust and download",
+    text: "Fine-tune the crop and download your images.",
+    // Crop marks.
+    icon: "M7 3v14h14M3 7h14v14",
+  },
+];
+
+const HOW_TO = [
   {
     title: "Choose your image",
-    body: "A PNG, JPG or WebP. Start with the largest version you have; it is resized in your browser and never uploaded.",
+    body: "A PNG, JPG or WebP. Start with the largest version you have; it is resized in your browser.",
   },
   {
     title: "Switch on your platforms",
@@ -38,7 +62,7 @@ const STEPS = [
   },
   {
     title: "Decide what happens to the edges",
-    body: "Crop to fill cuts what doesn't fit: press Adjust on a size, then drag and zoom to choose the part it keeps. Fit inside keeps the whole image and fills the rest with a color.",
+    body: "Crop to fill cuts what doesn't fit: press Adjust crop on a size, then drag and zoom to choose the part it keeps. Fit inside keeps the whole image and fills the rest with a color.",
   },
   {
     title: "Download",
@@ -54,17 +78,82 @@ const TIPS = [
   "A logo on a colored background resizes best with Fit inside and your brand color as the fill.",
 ];
 
+const LINK = "font-semibold text-[var(--cs-text)] underline";
+
+const FAQ: ToolFaqItem[] = [
+  {
+    question: "Which formats are supported?",
+    answer:
+      "You can add a PNG, JPG or WebP of up to 25 MB, and download the sizes as JPG or PNG. Several sizes at once come as one zip.",
+  },
+  {
+    question: "How does crop to fill work?",
+    answer:
+      "Crop to fill covers the whole size with your image and cuts what doesn't fit, evenly from both sides. Press Adjust crop on a size to drag and zoom to the part it should keep. Fit inside does the opposite: it keeps the whole image and fills the rest with a color you choose.",
+  },
+  {
+    question: "What does AI resize do?",
+    answer:
+      "Resize with AI lays your design out again for the shape of a size instead of cutting it. It is included with every brandbite plan, with a daily limit per company. For this, the image is sent to our AI service; everything else stays in your browser. The AI redraws the picture, so read the text and look at faces and logos before you post it.",
+  },
+  {
+    question: "Where do the sizes come from?",
+    answer: (
+      <>
+        The sizes are the same ones as in our{" "}
+        <Link href="/sizes" className={LINK}>
+          social media size guide
+        </Link>
+        , which lists each platform&apos;s sources and when the numbers were last checked. When a
+        platform changes a size, both update together.
+      </>
+    ),
+  },
+  {
+    question: "How do I resize an image for social media?",
+    answer: (
+      <ol className="flex list-decimal flex-col gap-2 pl-5">
+        {HOW_TO.map((step) => (
+          <li key={step.title}>
+            <span className="font-semibold text-[var(--cs-text)]">{step.title}.</span> {step.body}
+          </li>
+        ))}
+      </ol>
+    ),
+  },
+  {
+    question: "How do I make an image that survives a crop?",
+    answer: (
+      <ul className="flex list-disc flex-col gap-2 pl-5">
+        {TIPS.map((tip) => (
+          <li key={tip}>{tip}</li>
+        ))}
+      </ul>
+    ),
+  },
+];
+
 export default function SocialResizerPage() {
   return (
     <StudioShell
-      label="SOCIAL RESIZER"
+      label="FREE TOOLS"
       nav={null}
-      title="One image,"
-      accent="every social size."
-      blurb="Crop one image to the sizes each platform asks for, and download them together."
-      ctaHeading="Right size."
-      ctaHeadingAccent="Right design."
-      ctaBlurb="Need the post itself designed? Send a request to brandbite and get it back in every size."
+      title="Social resizer."
+      accent="One image, every format."
+      accentBelow
+      blurb="Resize your image for Instagram, Facebook, LinkedIn and more."
+      action={<SwitchTool current="social-resizer" />}
+      aside={
+        <Image
+          src="/tools/social-resizer-hero.webp"
+          alt=""
+          width={854}
+          height={640}
+          priority
+          className="-my-4 h-[250px] w-auto max-[1023px]:h-[200px]"
+        />
+      }
+      closing="ready"
     >
       <JsonLd
         data={[
@@ -73,66 +162,16 @@ export default function SocialResizerPage() {
         ]}
       />
 
+      <ToolNote
+        title="Resizing happens in your browser."
+        text="Your image is sent to us only if you use Resize with AI."
+      />
+
       <SocialResizer />
 
-      <section
-        aria-labelledby="resizer-how-heading"
-        className="mt-6 rounded-2xl border border-[var(--cs-border)] bg-[var(--cs-surface)] p-8 max-[767px]:p-5"
-      >
-        <h2 id="resizer-how-heading" className="text-2xl leading-8 font-semibold">
-          How to resize an image for social media
-        </h2>
-        <ol className="mt-4 grid grid-cols-2 gap-x-8 gap-y-5 max-[767px]:grid-cols-1">
-          {STEPS.map((step, index) => (
-            <li key={step.title} className="flex gap-3">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--cs-soft)] text-sm font-semibold text-[var(--cs-soft-text)]">
-                {index + 1}
-              </span>
-              <div>
-                <h3 className="text-base leading-6 font-semibold">{step.title}</h3>
-                <p className="mt-1 text-base leading-6 text-[var(--cs-muted)]">{step.body}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
+      <ToolSteps steps={STRIP} labelId="resizer-steps-heading" />
 
-        <h2 className="mt-8 text-2xl leading-8 font-semibold">Where the sizes come from</h2>
-        <p className="mt-3 max-w-[760px] text-base leading-7">
-          The sizes are the same ones as in our{" "}
-          <Link href="/sizes" className="font-semibold underline">
-            social media size guide
-          </Link>
-          , which lists each platform&apos;s sources and when the numbers were last checked. When a
-          platform changes a size, both update together.
-        </p>
-
-        <h2 className="mt-8 text-2xl leading-8 font-semibold">
-          Tips for images that survive a crop
-        </h2>
-        <ul className="mt-4 flex max-w-[760px] list-disc flex-col gap-2 pl-5 text-base leading-7">
-          {TIPS.map((tip) => (
-            <li key={tip}>{tip}</li>
-          ))}
-        </ul>
-
-        <h2 className="mt-8 text-2xl leading-8 font-semibold">Related free tools</h2>
-        <ul className="mt-3 flex flex-wrap gap-2">
-          {[
-            { href: "/sizes", label: "Social media size guide" },
-            { href: "/image-converter", label: "Image converter" },
-            { href: "/mockups", label: "Mockup Studio" },
-          ].map((link) => (
-            <li key={link.href}>
-              <Link
-                href={link.href}
-                className="flex h-11 items-center rounded-full border border-[var(--cs-border)] bg-[var(--cs-surface)] px-4 text-sm font-medium hover:border-[var(--cs-text)]"
-              >
-                {link.label}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </section>
+      <ToolFaq items={FAQ} labelId="resizer-faq-heading" />
     </StudioShell>
   );
 }

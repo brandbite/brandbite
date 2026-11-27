@@ -8,15 +8,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 
-import { DownloadIcon, UploadIcon } from "@/components/colors/studio/icons";
+import { CloseIcon, DownloadIcon, UploadIcon } from "@/components/colors/studio/icons";
 import { studioButtonClasses } from "@/components/colors/studio/studio-button";
 import {
   ColorChoice,
   FilePicker,
-  Segmented,
-  ToggleGroup,
   TOOL_ERROR,
   TOOL_FOCUS,
   TOOL_HINT,
@@ -24,6 +22,7 @@ import {
   TOOL_PANEL,
   useToolAccess,
 } from "@/components/tools/tool-ui";
+import { StepHeading } from "@/components/tools/tool-page";
 import {
   DEFAULT_CROP,
   hasQuality,
@@ -60,8 +59,60 @@ const BACKDROPS = [
 /** JPG and WebP quality for exports: high enough that social platforms' own compression is what you see. */
 const QUALITY = 0.92;
 
+const CARD_BUTTON = `flex h-11 shrink-0 items-center justify-center rounded-[10px] border border-[var(--cs-border)] text-sm font-semibold hover:border-[var(--cs-text)] disabled:cursor-not-allowed disabled:opacity-50 ${TOOL_FOCUS}`;
+
+function formatSize(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/** One choice out of a few, as rows; the chosen row is lavender. */
+function RadioGroup<T extends string>({
+  label,
+  name,
+  options,
+  value,
+  onChange,
+  hint,
+}: {
+  label: string;
+  name: string;
+  options: { id: T; label: string }[];
+  value: T;
+  onChange: (value: T) => void;
+  hint?: string;
+}) {
+  return (
+    <fieldset>
+      <legend className={TOOL_LABEL}>{label}</legend>
+      <div className="mt-2 flex flex-col gap-1">
+        {options.map((option) => (
+          <label
+            key={option.id}
+            className={`flex min-h-11 cursor-pointer items-center gap-3 rounded-[10px] px-3 text-sm leading-5 font-medium ${
+              option.id === value ? "bg-[var(--cs-soft)]" : "hover:bg-[var(--cs-background)]"
+            }`}
+          >
+            <input
+              type="radio"
+              name={name}
+              checked={option.id === value}
+              onChange={() => onChange(option.id)}
+              className="h-5 w-5 shrink-0 accent-[var(--cs-selected)]"
+            />
+            {option.label}
+          </label>
+        ))}
+      </div>
+      {hint ? <p className={`mt-2 ${TOOL_HINT}`}>{hint}</p> : null}
+    </fieldset>
+  );
+}
+
 export function SocialResizer() {
   const access = useToolAccess();
+  const fileInputId = useId();
+  const [dragging, setDragging] = useState(false);
   const bitmapRef = useRef<ImageBitmap | null>(null);
 
   const [source, setSource] = useState<{
@@ -69,6 +120,7 @@ export function SocialResizer() {
     url: string;
     width: number;
     height: number;
+    size: number;
   } | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [platforms, setPlatforms] = useState<string[]>(START_PLATFORMS);
@@ -166,6 +218,7 @@ export function SocialResizer() {
         url: URL.createObjectURL(file),
         width: bitmap.width,
         height: bitmap.height,
+        size: file.size,
       });
       setCrops({});
       dropAiResults();
@@ -175,6 +228,18 @@ export function SocialResizer() {
     } catch {
       setFileError("We couldn't read that image. Try another file.");
     }
+  };
+
+  const removeSource = () => {
+    bitmapRef.current?.close();
+    bitmapRef.current = null;
+    setSource(null);
+    setCrops({});
+    dropAiResults();
+    setAiErrors({});
+    setEditing(null);
+    setViewing(null);
+    setStatus("Image removed.");
   };
 
   const togglePlatform = (slug: string) => {
@@ -269,173 +334,301 @@ export function SocialResizer() {
     }
   };
 
+  const formatName = format === "png" ? "PNG" : "JPG";
+
   return (
-    <section
-      aria-label="Social resizer"
-      className="grid grid-cols-[360px_minmax(0,1fr)] gap-6 max-[1023px]:grid-cols-1"
-    >
-      <div className={`flex flex-col gap-6 ${TOOL_PANEL}`}>
-        <div>
-          <p className={TOOL_LABEL}>Image</p>
-          <div className="mt-2">
-            <FilePicker
-              label={source ? "Change image" : "Choose an image"}
-              accept={INPUT_IMAGE_TYPES}
-              onFiles={(files) => void onFiles(files)}
+    <section aria-label="Social resizer" className="flex flex-col gap-8">
+      <div>
+        <StepHeading
+          number={1}
+          title="Source"
+          hint="Add the image you want to resize for social media."
+        />
+        <div className={`mt-4 ${TOOL_PANEL} ${source ? "" : "!p-3"}`}>
+          {source ? (
+            <div className="flex flex-wrap items-center gap-4">
+              {/* eslint-disable-next-line @next/next/no-img-element -- a file on the visitor's device */}
+              <img
+                src={source.url}
+                alt=""
+                width={72}
+                height={72}
+                className="h-[72px] w-[72px] shrink-0 rounded-xl border border-[var(--cs-border)] bg-[var(--cs-background)] object-cover"
+              />
+              <div className="min-w-[160px] flex-1">
+                <p className="truncate text-base leading-6 font-semibold">{source.name}</p>
+                <p className={`${TOOL_HINT} tabular-nums`}>
+                  {source.width} × {source.height} · {formatSize(source.size)}
+                </p>
+              </div>
+              <FilePicker
+                label="Replace"
+                accept={INPUT_IMAGE_TYPES}
+                onFiles={(files) => void onFiles(files)}
+              />
+              <button
+                type="button"
+                aria-label={`Remove ${source.name}`}
+                onClick={removeSource}
+                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] hover:bg-[var(--cs-background)] ${TOOL_FOCUS}`}
+              >
+                <CloseIcon />
+              </button>
+            </div>
+          ) : (
+            <label
+              htmlFor={fileInputId}
+              onDragOver={(event) => {
+                event.preventDefault();
+                setDragging(true);
+              }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={(event) => {
+                event.preventDefault();
+                setDragging(false);
+                void onFiles(Array.from(event.dataTransfer.files));
+              }}
+              className={`flex cursor-pointer flex-col items-center rounded-xl border border-dashed px-4 py-7 text-center transition-colors focus-within:border-[var(--cs-text)] ${
+                dragging
+                  ? "border-[var(--cs-selected)] bg-[var(--cs-soft)]"
+                  : "border-[#B9B5AE] hover:border-[var(--cs-text)]"
+              }`}
             >
-              <UploadIcon />
-            </FilePicker>
-          </div>
-          <p className={`mt-2 ${TOOL_HINT}`}>
-            {source
-              ? `${source.name} · ${source.width} × ${source.height}`
-              : "PNG, JPG or WebP, up to 25 MB. It stays in your browser."}
-          </p>
+              <input
+                id={fileInputId}
+                type="file"
+                accept={INPUT_IMAGE_TYPES.join(",")}
+                className="sr-only"
+                onChange={(event) => {
+                  void onFiles(Array.from(event.target.files ?? []));
+                  event.target.value = "";
+                }}
+              />
+              <span
+                aria-hidden
+                className="flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--cs-soft)] text-[var(--cs-soft-text)]"
+              >
+                <UploadIcon />
+              </span>
+              <span className="mt-3 text-base leading-6 font-semibold">
+                Drag and drop an image here
+              </span>
+              <span className={TOOL_HINT}>or click to choose a file</span>
+              <span className={`mt-3 ${studioButtonClasses("secondary")}`}>Choose file</span>
+              <span className={`mt-3 ${TOOL_HINT}`}>PNG, JPG or WebP, up to 25 MB.</span>
+            </label>
+          )}
           {fileError ? (
-            <p role="alert" className={`mt-2 ${TOOL_ERROR}`}>
+            <p role="alert" className={`mt-3 ${TOOL_ERROR}`}>
               {fileError}
             </p>
           ) : null}
         </div>
-
-        <ToggleGroup
-          label="Platforms"
-          options={PLATFORMS.map((platform) => ({ id: platform.slug, label: platform.name }))}
-          values={platforms}
-          onToggle={togglePlatform}
-        />
-
-        {shownPlatforms.map((platform) => (
-          <fieldset key={platform.slug}>
-            <legend className={TOOL_LABEL}>{platform.name} sizes</legend>
-            <ul className="mt-1">
-              {platform.targets.map((target) => (
-                <li key={target.key}>
-                  <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm leading-5">
-                    <input
-                      type="checkbox"
-                      checked={selected.includes(target.key)}
-                      onChange={() => toggleTarget(target.key)}
-                      className="h-5 w-5 shrink-0 accent-[var(--cs-text)]"
-                    />
-                    <span className="min-w-0 flex-1">{target.name}</span>
-                    <span className="shrink-0 text-[var(--cs-muted)] tabular-nums">
-                      {target.width} × {target.height}
-                    </span>
-                  </label>
-                </li>
-              ))}
-            </ul>
-          </fieldset>
-        ))}
-
-        <div>
-          <Segmented<FitMode>
-            label="When the shape doesn't match"
-            options={[
-              { id: "cover", label: "Crop to fill" },
-              { id: "contain", label: "Fit inside" },
-            ]}
-            value={mode}
-            onChange={setMode}
-          />
-          <p className={`mt-2 ${TOOL_HINT}`}>
-            {mode === "cover"
-              ? "Fills each size and cuts the edges evenly."
-              : "Keeps the whole image and fills the rest with a color."}
-          </p>
-        </div>
-
-        {mode === "contain" ? (
-          <ColorChoice
-            label="Fill color"
-            value={backdrop}
-            onChange={setBackdrop}
-            brandColors={access.brandColors}
-            presets={BACKDROPS}
-          />
-        ) : null}
-
-        <Segmented<OutputFormat>
-          label="File type"
-          options={[
-            { id: "jpeg", label: "JPG" },
-            { id: "png", label: "PNG" },
-          ]}
-          value={format}
-          onChange={setFormat}
-        />
       </div>
 
-      <div className="flex min-w-0 flex-col gap-4">
-        <div className={TOOL_PANEL}>
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              disabled={!source || targets.length === 0 || busy}
-              onClick={() => void download(targets)}
-              className={studioButtonClasses("primary")}
-            >
-              <DownloadIcon />
-              {busy
-                ? "Preparing…"
-                : targets.length > 1
-                  ? `Download ${targets.length} sizes (.zip)`
-                  : "Download"}
-            </button>
-            <p className={`min-w-[180px] flex-1 ${TOOL_HINT}`}>
-              {!source
-                ? "Choose an image to see it in every size."
-                : targets.length === 0
-                  ? "Tick at least one size."
-                  : mode === "cover"
-                    ? "Press Adjust on a size to choose what it keeps."
-                    : "Or download one size from its card below."}
-            </p>
+      <div>
+        <StepHeading
+          number={2}
+          title="Choose formats"
+          hint="Select the platforms and the sizes you need."
+        />
+        <div className={`mt-4 ${TOOL_PANEL}`}>
+          <fieldset>
+            <legend className="sr-only">Platforms</legend>
+            <div className="flex flex-wrap gap-2">
+              {PLATFORMS.map((platform) => {
+                const on = platforms.includes(platform.slug);
+                return (
+                  <button
+                    key={platform.slug}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => togglePlatform(platform.slug)}
+                    className={`flex h-11 min-w-[120px] flex-1 items-center justify-center rounded-[10px] border px-4 text-sm font-semibold whitespace-nowrap transition-colors ${TOOL_FOCUS} ${
+                      on
+                        ? "border-[var(--cs-selected)] bg-[var(--cs-soft)] text-[var(--cs-soft-text)]"
+                        : "border-[var(--cs-border)] bg-[var(--cs-surface)] hover:border-[var(--cs-text)]"
+                    }`}
+                  >
+                    {platform.name}
+                  </button>
+                );
+              })}
+            </div>
+          </fieldset>
+
+          <div className="mt-5 grid grid-cols-[minmax(0,1fr)_300px] gap-8 max-[1023px]:grid-cols-1">
+            <div className="flex flex-col gap-4">
+              {shownPlatforms.length === 0 ? (
+                <p className={TOOL_HINT}>Switch on a platform to see its sizes.</p>
+              ) : null}
+              {shownPlatforms.map((platform) => (
+                <fieldset key={platform.slug}>
+                  <legend className={TOOL_LABEL}>{platform.name}</legend>
+                  <ul className="mt-1 grid grid-cols-2 gap-x-6 max-[767px]:grid-cols-1">
+                    {platform.targets.map((target) => (
+                      <li key={target.key}>
+                        <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm leading-5">
+                          <input
+                            type="checkbox"
+                            checked={selected.includes(target.key)}
+                            onChange={() => toggleTarget(target.key)}
+                            className="h-5 w-5 shrink-0 accent-[var(--cs-selected)]"
+                          />
+                          <span className="min-w-0">
+                            <span className="font-semibold">{target.name}</span>{" "}
+                            <span className="text-[var(--cs-muted)] tabular-nums">
+                              {target.width} × {target.height}
+                              {target.name.includes("(") ? "" : ` (${target.ratio})`}
+                            </span>
+                          </span>
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                </fieldset>
+              ))}
+            </div>
+
+            <div className="flex flex-col gap-5 min-[1024px]:border-l min-[1024px]:border-[var(--cs-border)] min-[1024px]:pl-8">
+              <RadioGroup<FitMode>
+                label="Resize method"
+                name={`${fileInputId}-mode`}
+                options={[
+                  { id: "cover", label: "Crop to fill" },
+                  { id: "contain", label: "Fit inside" },
+                ]}
+                value={mode}
+                onChange={setMode}
+                hint={
+                  mode === "cover"
+                    ? "Fills each size and cuts the edges evenly."
+                    : "Keeps the whole image and fills the rest with a color."
+                }
+              />
+              {mode === "contain" ? (
+                <ColorChoice
+                  label="Fill color"
+                  value={backdrop}
+                  onChange={setBackdrop}
+                  brandColors={access.brandColors}
+                  presets={BACKDROPS}
+                />
+              ) : null}
+              <RadioGroup<OutputFormat>
+                label="Output format"
+                name={`${fileInputId}-format`}
+                options={[
+                  { id: "jpeg", label: "JPG" },
+                  { id: "png", label: "PNG" },
+                ]}
+                value={format}
+                onChange={setFormat}
+              />
+            </div>
           </div>
-          {exportError ? (
-            <p role="alert" className={`mt-2 ${TOOL_ERROR}`}>
-              {exportError}
-            </p>
-          ) : null}
-          <p role="status" className="sr-only">
-            {status}
-          </p>
-          {mode === "cover" ? (
-            <p className={`mt-3 border-t border-[var(--cs-border)] pt-3 ${TOOL_HINT}`}>
-              {access.aiExtend ? (
-                <>
-                  <span className="font-semibold text-[var(--cs-text)]">Resize with AI</span> lays
-                  your design out again for the shape of a size instead of cutting it. The AI
-                  redraws the picture, so read the text and look at faces and logos before you post
-                  it. {aiRemaining ?? access.aiExtendDailyLimit} of {access.aiExtendDailyLimit} left
-                  in this 24 hours for your company.
-                </>
-              ) : (
-                <>
-                  <span className="font-semibold text-[var(--cs-text)]">Resize with AI</span>, which
-                  lays your design out again for each shape instead of cutting it, is included with
-                  every brandbite plan.
-                  {access.signedIn ? null : (
-                    <>
-                      {" "}
-                      <Link href="/login" className="font-semibold text-[var(--cs-text)] underline">
-                        Sign in
-                      </Link>{" "}
-                      if you have one.
-                    </>
-                  )}
-                </>
-              )}
-            </p>
-          ) : null}
         </div>
+      </div>
+
+      <div>
+        <StepHeading
+          number={3}
+          title="Preview & download"
+          hint="Review your resized images, adjust the crop, and download them one by one or all at once."
+        />
+        <div className="mt-4 flex flex-wrap items-stretch gap-3">
+          {mode === "cover" ? (
+            <p className="flex min-w-[280px] flex-1 flex-wrap items-center gap-x-4 gap-y-1 rounded-xl bg-[var(--cs-soft)] px-4 py-2.5 text-sm leading-5 text-[var(--cs-soft-text)]">
+              <span className="flex items-center gap-2 font-semibold">
+                <svg
+                  aria-hidden
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.75"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="shrink-0"
+                >
+                  <path d="M10 3l1.8 5.2L17 10l-5.2 1.8L10 17l-1.8-5.2L3 10l5.2-1.8zM18 15l.9 2.1L21 18l-2.1.9L18 21l-.9-2.1L15 18l2.1-.9z" />
+                </svg>
+                Resize with AI
+                {access.aiExtend ? null : (
+                  <span className="rounded-full bg-[var(--cs-surface)] px-2.5 py-0.5 text-xs leading-5 font-semibold">
+                    Plan
+                  </span>
+                )}
+              </span>
+              <span className="min-w-[200px] flex-1">
+                {access.aiExtend ? (
+                  <>
+                    Lays your design out again for a size instead of cutting it. The AI redraws the
+                    picture, so check text, faces and logos.{" "}
+                    <span className="font-semibold tabular-nums">
+                      {aiRemaining ?? access.aiExtendDailyLimit} of {access.aiExtendDailyLimit} left
+                    </span>{" "}
+                    in this 24 hours for your company.
+                  </>
+                ) : (
+                  <>
+                    Lays your design out again for each shape instead of cutting it. Included with
+                    every brandbite plan.
+                    {access.signedIn ? null : (
+                      <>
+                        {" "}
+                        <Link href="/login" className="font-semibold underline">
+                          Sign in
+                        </Link>{" "}
+                        if you have one.
+                      </>
+                    )}
+                  </>
+                )}
+              </span>
+            </p>
+          ) : (
+            <span className="flex-1" />
+          )}
+          <button
+            type="button"
+            disabled={!source || targets.length === 0 || busy}
+            onClick={() => void download(targets)}
+            className={`${studioButtonClasses("primary")} !h-auto !min-h-12 !px-6`}
+          >
+            <DownloadIcon />
+            {busy
+              ? "Preparing…"
+              : targets.length > 1
+                ? `Download ${targets.length} sizes (ZIP)`
+                : `Download ${formatName}`}
+          </button>
+        </div>
+        {exportError ? (
+          <p role="alert" className={`mt-2 ${TOOL_ERROR}`}>
+            {exportError}
+          </p>
+        ) : null}
+        <p role="status" className="sr-only">
+          {status}
+        </p>
 
         {targets.length > 0 ? (
-          <ul className="grid grid-cols-3 gap-4 max-[1279px]:grid-cols-2 max-[639px]:grid-cols-1">
+          <ul className="mt-4 grid grid-cols-3 gap-4 max-[1023px]:grid-cols-2 max-[639px]:grid-cols-1">
             {targets.map((target) => (
               <li key={target.key} className={`${TOOL_PANEL} flex flex-col gap-3 !p-4`}>
-                <div className="flex h-44 items-center justify-center rounded-xl bg-[var(--cs-background)] p-2">
+                <div>
+                  <p className="truncate text-base leading-6 font-semibold">
+                    {target.name}
+                    {target.name.includes("(") ? "" : ` (${target.ratio})`}
+                  </p>
+                  <p className={`${TOOL_HINT} tabular-nums`}>
+                    {target.platform} · {target.width} × {target.height}
+                    {aiResults[target.key] ? " · AI resized" : ""}
+                  </p>
+                </div>
+                <div className="flex h-56 items-center justify-center rounded-xl bg-[var(--cs-background)] p-2">
                   <button
                     type="button"
                     disabled={!source}
@@ -480,23 +673,29 @@ export function SocialResizer() {
                     ) : null}
                   </button>
                 </div>
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm leading-5 font-semibold">{target.name}</p>
-                    <p className={`${TOOL_HINT} tabular-nums`}>
-                      {target.platform} · {target.width} × {target.height}
-                      {aiResults[target.key] ? " · AI resized" : ""}
-                    </p>
-                  </div>
+                <div className="flex gap-2">
                   {mode === "cover" ? (
                     <button
                       type="button"
                       disabled={!source}
                       aria-label={`Adjust the crop of ${target.platform} ${target.name}`}
                       onClick={() => setEditing(target.key)}
-                      className={`flex h-11 shrink-0 items-center justify-center rounded-[10px] border border-[var(--cs-border)] px-3 text-sm font-semibold hover:border-[var(--cs-text)] disabled:cursor-not-allowed disabled:opacity-50 ${TOOL_FOCUS}`}
+                      className={`${CARD_BUTTON} flex-1 gap-2 px-3`}
                     >
-                      Adjust
+                      <svg
+                        aria-hidden
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.75"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M7 3v14h14M3 7h14v14" />
+                      </svg>
+                      Adjust crop
                     </button>
                   ) : null}
                   <button
@@ -504,9 +703,10 @@ export function SocialResizer() {
                     disabled={!source || busy}
                     aria-label={`Download ${target.platform} ${target.name}`}
                     onClick={() => void download([target])}
-                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] border border-[var(--cs-border)] hover:border-[var(--cs-text)] disabled:cursor-not-allowed disabled:opacity-50 ${TOOL_FOCUS}`}
+                    className={`${CARD_BUTTON} ${mode === "cover" ? "w-11" : "flex-1 gap-2 px-3"}`}
                   >
                     <DownloadIcon />
+                    {mode === "cover" ? null : "Download"}
                   </button>
                 </div>
                 {mode === "cover" && access.aiExtend && source ? (
@@ -560,10 +760,13 @@ export function SocialResizer() {
             ))}
           </ul>
         ) : (
-          <p className={`${TOOL_PANEL} ${TOOL_HINT}`}>
+          <p className={`mt-4 ${TOOL_PANEL} ${TOOL_HINT}`}>
             Switch on a platform and tick the sizes you need.
           </p>
         )}
+        {source ? null : targets.length > 0 ? (
+          <p className={`mt-3 ${TOOL_HINT}`}>Add an image to see it in every size.</p>
+        ) : null}
       </div>
 
       {source && viewingTarget ? (

@@ -9,8 +9,14 @@
 import { NextResponse } from "next/server";
 
 import { AI_EXTEND_DAILY_LIMIT } from "@/lib/image-tools/ai-extend";
+import { NEWSLETTER_AI_DAILY_LIMIT } from "@/lib/newsletter/ai";
 import { toolEntitlement } from "@/lib/tools/entitlement";
-import { aiExtendAvailable, getToolAccess } from "@/lib/tools/entitlement.server";
+import {
+  aiExtendAvailable,
+  getToolAccess,
+  newsletterAiAvailable,
+  newsletterUploadAvailable,
+} from "@/lib/tools/entitlement.server";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +30,10 @@ export async function GET() {
       hasBrandLogo: access.hasBrandLogo,
       aiExtend: aiExtendAvailable(access.entitlement),
       aiExtendDailyLimit: AI_EXTEND_DAILY_LIMIT,
+      newsletterAi: newsletterAiAvailable(access.entitlement),
+      newsletterAiDailyLimit: NEWSLETTER_AI_DAILY_LIMIT,
+      newsletterUpload: newsletterUploadAvailable(access.entitlement),
+      newsletterTest: access.entitlement.pro && Boolean(process.env.RESEND_API_KEY),
     });
   } catch (error) {
     console.error("[tools/entitlement] failed", error);
@@ -35,6 +45,10 @@ export async function GET() {
       hasBrandLogo: false,
       aiExtend: false,
       aiExtendDailyLimit: AI_EXTEND_DAILY_LIMIT,
+      newsletterAi: false,
+      newsletterAiDailyLimit: NEWSLETTER_AI_DAILY_LIMIT,
+      newsletterUpload: false,
+      newsletterTest: false,
     });
   }
 }

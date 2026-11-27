@@ -111,6 +111,8 @@ const PUBLIC_PATHS = [
   // the visitor is signed in and on a plan. The check answers "signed out"
   // itself; listing it here keeps a visitor from being sent to /login.
   "/mockups",
+  // Every free tool on one page (static, no API).
+  "/tools",
   // Free image and QR tools (client-side, no API of their own).
   "/social-resizer",
   "/image-converter",
@@ -118,6 +120,9 @@ const PUBLIC_PATHS = [
   "/type-scale",
   "/logo-pack",
   "/email-signature",
+  // Newsletter builder. Its two APIs (writing with AI, image upload) are for
+  // signed-in plan customers and are deliberately not listed.
+  "/newsletter-builder",
   "/post-preview",
   "/api/tools/entitlement",
   "/api/tools/signature-logo",

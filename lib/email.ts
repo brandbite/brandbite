@@ -62,3 +62,35 @@ export async function sendNotificationEmail(
     console.error("[email] failed to send", err);
   }
 }
+
+export type EmailResult = { ok: true } | { ok: false; reason: "not_configured" | "failed" };
+
+/**
+ * Send one email and say whether it went out. For sends a person asked for
+ * and is waiting on (a test newsletter), where a silent failure would leave
+ * them watching an empty inbox. Never throws.
+ */
+export async function sendEmail(
+  to: string,
+  subject: string,
+  html: string,
+  text?: string,
+): Promise<EmailResult> {
+  if (!resend) return { ok: false, reason: "not_configured" };
+  try {
+    const result = await Promise.race([
+      resend.emails.send({ from: FROM, to, subject, html, ...(text ? { text } : {}) }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Resend timed out")), SEND_TIMEOUT_MS * 2),
+      ),
+    ]);
+    if (result.error) {
+      console.error("[email] send refused", result.error);
+      return { ok: false, reason: "failed" };
+    }
+    return { ok: true };
+  } catch (err) {
+    console.error("[email] failed to send", err);
+    return { ok: false, reason: "failed" };
+  }
+}

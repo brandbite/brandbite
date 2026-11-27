@@ -230,7 +230,7 @@ describe("email signature", () => {
   });
 
   it("shows stand-in details only while nothing is typed", () => {
-    expect(withSampleDetails(EMPTY_SIGNATURE).name).toBe("Your Name");
+    expect(withSampleDetails(EMPTY_SIGNATURE).name).toBe("Alex Morgan");
     expect(withSampleDetails(data)).toBe(data);
   });
 

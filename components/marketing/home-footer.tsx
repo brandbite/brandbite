@@ -1,14 +1,15 @@
 // -----------------------------------------------------------------------------
 // @file: components/marketing/home-footer.tsx
 // @purpose: Marketing footer (footer v2 design, Nov 2026): the purple Ready CTA
-//           band, then BB + logo, tagline and socials beside four link
-//           columns (Free tools, Resources, Company, Legal), and the © line.
-//           The columns give every free tool and resource a link from every
-//           marketing page, which search engines use to find and rank them.
+//           band, the free tools in three groups (FooterTools), then BB +
+//           logo, tagline and socials beside three link columns (Resources,
+//           Company, Legal), and the © line. Together they give every free
+//           tool and resource a link from every marketing page, which search
+//           engines use to find and rank them.
 //           Horizontal padding is 56px (px-14) to line up with HomeHeader.
-// @version: v3.0.0
+// @version: v4.0.0
 // @status: active
-// @lastUpdate: 2026-11-09
+// @lastUpdate: 2026-11-27
 // -----------------------------------------------------------------------------
 
 import Image from "next/image";
@@ -16,6 +17,7 @@ import Link from "next/link";
 
 import { copyrightLine } from "@/lib/brand";
 
+import { FooterTools } from "./footer-tools";
 import { ReadyBand } from "./ready-band";
 
 /** Main navigation links — shared with the auth-page footer (AuthShell). */
@@ -51,26 +53,6 @@ export const FOOTER_LEGAL_LINKS = [
 type FooterLink = { label: string; href: string; arrow?: boolean };
 
 export const FOOTER_COLUMNS: { title: string; links: FooterLink[] }[] = [
-  {
-    title: "Free tools",
-    links: [
-      { label: "Color Studio", href: "/colors" },
-      { label: "Size Guide", href: "/sizes" },
-      { label: "Brief Generator", href: "/brief-generator" },
-      { label: "Mockup Studio", href: "/mockups" },
-      { label: "Social Resizer", href: "/social-resizer" },
-      { label: "Image Converter", href: "/image-converter" },
-      { label: "QR Code", href: "/qr-code" },
-      { label: "Type Scale", href: "/type-scale" },
-      { label: "Logo Pack", href: "/logo-pack" },
-      { label: "Email Signature", href: "/email-signature" },
-      { label: "Post Preview", href: "/post-preview" },
-      { label: "Brand Kit", href: "/brand-kit" },
-      { label: "Cost Calculator", href: "/design-cost-calculator" },
-      // Shows Not found while the owner's "Brand playlist generator" switch is off.
-      { label: "Brand Playlist", href: "/brand-playlist" },
-    ],
-  },
   {
     title: "Resources",
     links: [
@@ -111,23 +93,31 @@ function Socials() {
   );
 }
 
-export function HomeFooter({ variant = "home" }: { variant?: "home" | "coming-soon" }) {
+export function HomeFooter({
+  variant = "home",
+  readyBand = true,
+}: {
+  variant?: "home" | "coming-soon";
+  /** The purple Ready band; a page that ends with its own closing band leaves it out. */
+  readyBand?: boolean;
+}) {
   const isComingSoon = variant === "coming-soon";
 
   return (
     <>
-      <ReadyBand />
+      {readyBand ? <ReadyBand /> : null}
+      <FooterTools />
       {/* Bottom padding is left to the page-level <div className="h-5" /> spacer
           that follows every <HomeFooter /> call site. */}
       <footer
-        className={`flex w-full flex-col px-14 pt-12 max-[1179px]:px-8 max-[767px]:px-5 max-[767px]:pt-10 ${
+        className={`flex w-full flex-col px-14 pt-12 max-[1179px]:px-8 max-[767px]:px-5 max-[767px]:pt-8 ${
           isComingSoon ? "bg-white" : ""
         }`}
       >
-        <div className="grid grid-cols-[minmax(0,1.3fr)_repeat(4,minmax(0,1fr))] gap-8 max-[1023px]:grid-cols-4 max-[767px]:grid-cols-2 max-[767px]:gap-x-6 max-[767px]:gap-y-10">
+        <div className="grid grid-cols-[minmax(0,1.3fr)_repeat(3,minmax(0,1fr))] gap-8 border-t border-[#D7D8DD] pt-12 max-[1023px]:grid-cols-3 max-[767px]:grid-cols-2 max-[767px]:gap-x-6 max-[767px]:gap-y-10 max-[767px]:border-t-0 max-[767px]:pt-0">
           {/* Brand: mascot + logo, tagline, socials. Full width above the
               columns on tablets; logo and socials share a row on phones. */}
-          <div className="flex flex-col gap-4 max-[1023px]:col-span-4 max-[767px]:col-span-2 max-[767px]:border-b max-[767px]:border-[#D7D8DD] max-[767px]:pb-8">
+          <div className="flex flex-col gap-4 max-[1023px]:col-span-3 max-[767px]:col-span-2 max-[767px]:border-b max-[767px]:border-[#D7D8DD] max-[767px]:pb-8">
             <div className="flex flex-row items-center justify-between gap-4">
               <Link
                 href="/"

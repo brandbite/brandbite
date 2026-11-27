@@ -24,6 +24,7 @@ export type ToolIconKey =
   | "typeScale"
   | "logoPack"
   | "signature"
+  | "newsletter"
   | "qr"
   | "mockup"
   | "ai"
@@ -266,6 +267,18 @@ export const HUB_TOOLS: HubTool[] = [
     access: "pro",
     roles: ["customer"],
     href: "/customer/tools/brand-voice-copy",
+  },
+  {
+    id: "newsletter-builder",
+    name: "Newsletter builder",
+    description: "An email newsletter in your brand, ready to send",
+    category: "create",
+    icon: "newsletter",
+    status: "live",
+    // Free to build; writing with AI and image upload come with a plan.
+    access: "free",
+    roles: ["customer"],
+    href: "/newsletter-builder",
   },
   {
     id: "post-preview",

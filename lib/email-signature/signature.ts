@@ -92,12 +92,12 @@ export const SAMPLE_SIGNATURE: Pick<
   SignatureData,
   "name" | "title" | "company" | "phone" | "email" | "website"
 > = {
-  name: "Your Name",
-  title: "Job title",
-  company: "Company",
+  name: "Alex Morgan",
+  title: "Marketing lead",
+  company: "Acme Studio",
   phone: "+1 555 010 0100",
-  email: "you@company.com",
-  website: "company.com",
+  email: "alex@example.com",
+  website: "example.com",
 };
 
 export function escapeHtml(text: string): string {
@@ -151,7 +151,7 @@ export function hasContent(data: SignatureData): boolean {
 }
 
 /** White or near-black, whichever reads better on a color. */
-function textOn(hex: string): string {
+export function textOn(hex: string): string {
   const n = Number.parseInt(hex.slice(1), 16);
   const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => {
     const c = v / 255;
